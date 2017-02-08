@@ -19,5 +19,3 @@
   when you originally displayed the hierarchy. This is useful when exploring
   through a call stack and you need to recall the last hierarchy that you
   displayed.
-
-### This plugin is not an official Google product
