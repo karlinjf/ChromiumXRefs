@@ -1,0 +1,10 @@
+[
+{
+  "caption": "Chromium Callers",
+  "command": "chromium_get_callers_hierarchy"
+},
+{
+  "caption": "Chromium Recall Callers",
+  "command": "chromium_recall_get_callers_hierarchy"
+}
+]
