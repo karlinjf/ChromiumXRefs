@@ -1,10 +1,19 @@
 [
   {
     "keys": ["ctrl+alt+c"],
-    "command": "chromium_get_callers_hierarchy"
+    "command": "chromium_get_callers_hierarchy",
+    "context":
+    [
+        {"key": "selector", "operator": "equal", "operand": "source.c++"}
+    ],
   },
+
   {
     "keys": ["ctrl+alt+r"],
-    "command": "chromium_recall_get_callers_hierarchy"
+    "command": "chromium_recall_get_callers_hierarchy",
+    "context":
+    [
+        {"key": "selector", "operator": "equal", "operand": "source.c++"}
+    ],
   }
 ]
