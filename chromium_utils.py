@@ -6,6 +6,7 @@ import getopt
 import html
 import html.parser
 import json
+import os.path
 import sys
 import urllib.request
 import urllib.parse
@@ -32,7 +33,6 @@ def getSignatureFor(src_file, method):
            '&annotation_request=e')
 
     url = url.format(file_name=urllib.parse.quote(src_file, safe=''))
-
     try:
         response = urllib.request.urlopen(url, timeout=3)
     except:
@@ -164,8 +164,6 @@ def getRefsFor(src_file, signature):
     for file_result in search_results:
         filename = file_result['file']['name']
         for match in file_result['match']:
-            #print match
-            #print ""
             if not (match['type'] == 'REFERENCED_AT'):
                 continue
 
@@ -182,6 +180,11 @@ def getWord(cmd):
         word = cmd.view.word(region)
         if not word.empty():
             return cmd.view.substr(word)
+
+def posixPath(path):
+  if os.path.sep == '\\':
+    return path.replace('\\','/');
+  return path;
 
 def getRoot(cmd, path):
   return 'src' + path.split('src')[1]
@@ -200,7 +203,9 @@ class ChromiumGetCallersCommand(sublime_plugin.TextCommand):
   def run(self, edit):
     function_name = getWord(self);
     file_path = getRoot(self, self.view.file_name());
+    file_path = posixPath(file_path);
     src_path = self.view.file_name().split('src')[0]
+    src_path = posixPath(src_path)
 
     signature = getSignatureFor(file_path, function_name);
     if not signature:
@@ -404,6 +409,8 @@ class ChromiumGetCallersHierarchyCommand(sublime_plugin.TextCommand):
     self.function_name = getWord(self);
     self.file_path = getRoot(self, self.view.file_name());
     self.src_path = self.view.file_name().split('src')[0]
+    self.file_path = posixPath(self.file_path);
+    self.src_path = posixPath(self.src_path);
 
     self.signature = getSignatureFor(self.file_path, self.function_name);
     if not self.signature:
