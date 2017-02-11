@@ -1,6 +1,6 @@
 [
   {
-    "keys": ["ctrl+alt+c"],
+    "keys": ["ctrl+alt+\\"],
     "command": "chromium_get_callers_hierarchy",
     "context":
     [
@@ -9,7 +9,7 @@
   },
 
   {
-    "keys": ["ctrl+alt+r"],
+    "keys": ["ctrl+alt+shift+\\"],
     "command": "chromium_recall_get_callers_hierarchy",
     "context":
     [
@@ -17,3 +17,4 @@
     ],
   }
 ]
+
