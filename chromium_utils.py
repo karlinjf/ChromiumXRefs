@@ -40,13 +40,19 @@ def getSignatureFor(src_file, method):
 
     result = response.read().decode('utf8');
     result = json.loads(result)['annotation_response'][0]
-    for snippet in result.get('annotation', []):
-      if not 'type' in snippet or not 'xref_signature' in snippet:
-          continue
 
-      signature = snippet['xref_signature']['signature']
-      if '%s(' % method in signature:
-        return signature
+    for snippet in result.get('annotation', []):
+      if not 'type' in snippet:
+        continue
+      if 'xref_signature' in snippet:
+        signature = snippet['xref_signature']['signature']
+        if '%s(' % method in signature:
+          return signature
+
+      elif 'internal_link' in snippet:
+        signature = snippet['internal_link']['signature']
+        if '::%s@chromium' % method in signature:
+          return signature
     return ''
 
 def getCallGraphFor(src_file, signature):
