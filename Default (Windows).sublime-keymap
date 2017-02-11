@@ -1,0 +1,10 @@
+[
+  {
+    "keys": ["ctrl+alt+c"],
+    "command": "chromium_get_callers_hierarchy"
+  },
+  {
+    "keys": ["ctrl+alt+r"],
+    "command": "chromium_recall_get_callers_hierarchy"
+  }
+]
