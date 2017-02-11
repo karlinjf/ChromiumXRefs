@@ -1,6 +1,6 @@
 # Chromium Utilities Plugin for Sublime Text
 ### Show call hierarchy for a given function
-- **Usage**: Ctrl+Alt+Left mouse click (or ctrl+alt+\) on a function in the
+- **Usage**: Ctrl+Alt+Left mouse click (or ctrl+alt+\\) on a function in the
   C++ Chromium codebase.
 - **Function**: Inserts a frame in the code with the callers of the given
   function on the line below the cursor. Click on the caller to jump to the
@@ -13,7 +13,7 @@
   you have made to the codebase will not be reflected.
 
 ### Recall call hierarchy for a given function
-- **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\) anywhere in C++ code.
+- **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\\) anywhere in C++ code.
 - **Function**: Recalls the last hierarchy displayed and inserts it below the
   cursor's position. You don't have to be in the same source file you were in
   when you originally displayed the hierarchy. This is useful when exploring
