@@ -1,5 +1,5 @@
-# Chromium Utilities Plugin for Sublime Text
-### Show details for a given function or variable
+# Chromium X-Refs Plugin for Sublime Text
+### Show cross-references for a given function or variable
 - **Usage**: Ctrl+Alt+Left mouse click (or ctrl+alt+\\) on a member function
   definition or variable in the C++ Chromium codebase.
 - **Function**: Inserts a frame in the code with links to declaration,
@@ -12,10 +12,10 @@
   only be as recent as what that site last indexed. This means local changes
   you have made to the codebase will not be reflected.
 
-### Recall call hierarchy for a given function
+### Recall last shown x-refs frame
 - **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\\) anywhere in C++ code.
-- **Function**: Recalls the last frame displayed and inserts it below the
-  cursor's position. You don't have to be in the same source file you were in
-  when you originally displayed the hierarchy. This is useful when exploring
-  through a call stack and you need to recall the last hierarchy that you
-  displayed.
+- **Function**: Recalls the last x-refs frame displayed and inserts it below
+  the cursor's position. You don't have to be in the same source file you were
+  in when you originally displayed the hierarchy. This is useful when
+  exploring through a call stack and you need to recall the last hierarchy
+  that you displayed.
