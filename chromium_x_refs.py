@@ -412,6 +412,8 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
       last_file = ''
       for ref in xrefs['references']:
+        if not self.show_tests and 'test' in ref['filename'].lower():
+          continue
         if ref['filename'] != last_file:
             if last_file != '':
               body += '</ul>';
