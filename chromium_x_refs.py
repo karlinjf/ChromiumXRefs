@@ -2,21 +2,74 @@
 # Use of this source code is governed by the Apache license found in the LICENSE
 # file.
 
+import datetime
 import getopt
 import html
 import html.parser
 import json
 import os.path
 import sys
+import tempfile
+import threading
+import time
 import urllib.request
 import urllib.parse
 
 import sublime, sublime_plugin
 
 gLastChromeCmd = None  # The last chromium cmd that ran
+gFileCache = None;
 
 # TODO store the phantom's location so that update calls can use the same location
 # TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
+
+
+# A key/value store that stores objects to disk in temporary objects
+# for 30 minutes.
+class FileCache:
+  def __init__(self):
+    self.store = {}
+    self.gc();
+    threading.Timer(15 * 60, self.gc).start();
+
+  def put(self, url, data):
+    f = tempfile.TemporaryFile();
+    f.write(data);
+    self.store[url] = (f, datetime.datetime.now());
+
+  def get(self, url):
+    if not url in self.store:
+      return ''
+    (f, timestamp) = self.store[url]
+    f.seek(0);
+    return f.read();
+
+  def gc(self):
+    expired = datetime.datetime.now() - datetime.timedelta(minutes=30);
+    remove = []
+    for url, (f, timestamp) in self.store.items():
+      if timestamp < expired:
+        remove.append(url)
+    for url in remove:
+      self.store.pop(url);
+
+
+# Retrieve the url by first trying to cache and falling back to the network.
+def retrieve(url):
+  global gFileCache
+  if not gFileCache:
+    gFileCache = FileCache();
+
+  cached_response = gFileCache.get(url);
+  if (cached_response):
+    return cached_response.decode('utf8');
+  try:
+    response = urllib.request.urlopen(url, timeout=3)
+  except:
+    return ''
+  result = response.read()
+  gFileCache.put(url, result);
+  return result.decode('utf8');
 
 def getSignatureFor(src_file, method):
     url = ('https://cs.chromium.org/codesearch/json'
@@ -32,12 +85,11 @@ def getSignatureFor(src_file, method):
            '&follow_branches=false'
            '&annotation_request=e')
     url = url.format(file_name=urllib.parse.quote(src_file, safe=''))
-    try:
-        response = urllib.request.urlopen(url, timeout=3)
-    except:
-        sys.exit(2)
 
-    result = response.read().decode('utf8');
+    result = retrieve(url);
+    if not result:
+      sys.exit(2);
+
     result = json.loads(result)['annotation_response'][0]
 
     for snippet in result.get('annotation', []):
@@ -66,12 +118,10 @@ def getCallGraphFor(src_file, signature):
          '&call_graph_request=e')
     url = url.format(signature=urllib.parse.quote(signature, safe=''), file_name=urllib.parse.quote(src_file, safe=''))
 
-    try:
-        response = urllib.request.urlopen(url, timeout=3)
-    except:
-        return []
+    result = retrieve(url);
+    if not result:
+      sys.exit(2);
 
-    result = response.read().decode('utf8');
     result = json.loads(result)['call_graph_response'][0];
     node = result['node'];
 
@@ -112,12 +162,10 @@ def getXrefsFor(src_file, signature):
            '&max_num_results=500'
            '&xref_search_request=e')
     url = url.format(signature=urllib.parse.quote(signature, safe=''), file_name=urllib.parse.quote(src_file, safe=''))
-    try:
-        response = urllib.request.urlopen(url, timeout=3)
-    except:
-        sys.exit(2)
+    result = retrieve(url);
+    if not result:
+      sys.exit(2);
 
-    result = response.read().decode('utf8');
     result = json.loads(result)['xref_search_response'][0]
     status = result['status']
     if not 'search_result' in result:
@@ -152,12 +200,10 @@ def getRefsFor(src_file, signature):
            '&max_num_results=500'
            '&xref_search_request=e')
     url = url.format(signature=urllib.parse.quote(signature, safe=''), file_name=urllib.parse.quote(src_file, safe=''))
-    try:
-        response = urllib.request.urlopen(url, timeout=3)
-    except:
-        sys.exit(2)
+    result = retrieve(url);
+    if not result:
+      sys.exit(2);
 
-    result = response.read().decode('utf8');
     result = json.loads(result)['xref_search_response'][0]
     status = result['status']
     if not 'search_result' in result:
