@@ -187,6 +187,25 @@ def getWord(cmd):
         if not word.empty():
             return cmd.view.substr(word)
 
+def getPreviousWord(cmd):
+  for region in cmd.view.sel():
+    if region.empty():
+      word = cmd.view.word(region);
+      if not word.empty():
+        prev_word = cmd.view.word(sublime.Region(word.a-2,word.a-1));
+        return cmd.view.substr(prev_word);
+
+def getPreviousSymbol(cmd):
+  for region in cmd.view.sel():
+    if region.empty():
+      word = cmd.view.word(region);
+      if not word.empty():
+        prev_char = cmd.view.substr(sublime.Region(word.a-1,word.a));
+        if prev_char == '>':
+          if (cmd.view.substr(sublime.Region(word.a-2,word.a-1))) == '-':
+            return '->'
+        return prev_char;
+
 def posixPath(path):
   if os.path.sep == '\\':
     return path.replace('\\','/');
@@ -336,7 +355,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body += "<div class=navbar>";
     xrefs = self.xrefs;
 
-    body += '<b>' + self.function_name + ':</b>' + tab
+    body += '<b>' + self.selected_word + ':</b>' + tab
     if 'declaration' in xrefs:
       body += '<a href=declared:>Declaration</a>' + tab
     if 'definition' in xrefs:
@@ -389,6 +408,14 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
   def getSignatureForSelection(self, edit):
     self.selected_word = getWord(self);
+
+    previous_symbol = getPreviousSymbol(self);
+    if previous_symbol == '.' or previous_symbol == '->':
+      # This is a function or member of another class.
+      # TODO: DIg down and get its signature. Also need to get at static function calls (e.g., a::b())
+      print("Unable to retrieve signature for funcrion or member of another class");
+      return;
+
     self.file_path = posixPath(getRoot(self, self.view.file_name()));
     self.src_path = posixPath(self.view.file_name().split('src')[0]);
     self.signature = getSignatureFor(self.file_path, self.selected_word);
