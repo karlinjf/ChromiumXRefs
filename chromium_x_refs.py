@@ -205,7 +205,7 @@ def goToSelection(cmd, src_path, callers, sel):
     return
   goToLocation(cmd, src_path, callers[sel])
 
-class ChromiumGetCallersCommand(sublime_plugin.TextCommand):
+class ChromiumXRefsPopupCommand(sublime_plugin.TextCommand):
   def run(self, edit):
     function_name = getWord(self);
     file_path = getRoot(self, self.view.file_name());
@@ -224,7 +224,7 @@ class ChromiumGetCallersCommand(sublime_plugin.TextCommand):
     if items:
       self.view.show_popup_menu(items, lambda x: goToSelection(self, src_path, callers, x));
 
-class ChromiumGetCallersHierarchyCommand(sublime_plugin.TextCommand):
+class ChromiumXRefsCommand(sublime_plugin.TextCommand):
   def createPhantom(self, doc):
     loc = self.view.line(self.view.sel()[0]);
     return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
@@ -251,18 +251,18 @@ class ChromiumGetCallersHierarchyCommand(sublime_plugin.TextCommand):
       if link.split(':')[1] == 'test':
         self.show_tests = False;
         doc = self.genHtml();
-        self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+        self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
         return;
 
     if link_type == 'nofilter':
       if link.split(':')[1] == 'test':
         self.show_tests = True;
         doc = self.genHtml()
-        self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+        self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
         return;
 
     if link_type == 'killPhantom':
-      self.view.chromium_utils_phantoms.update([])
+      self.view.chromium_x_refs_phantoms.update([])
       return;
 
     str_loc = link.split(':')[1]
@@ -281,18 +281,18 @@ class ChromiumGetCallersHierarchyCommand(sublime_plugin.TextCommand):
     elif (link_type == 'expand'):
       caller['callers'] = getCallGraphFor(self.file_path, caller['calling_signature'])
       doc = self.genHtml()
-      self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+      self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
     elif (link_type == 'shrink'):
       caller.pop('callers')
       doc = self.genHtml()
-      self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+      self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
     elif (link_type == 'filter'):
 
       caller.pop('callers')
       doc = self.genHtml()
-      self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+      self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
 
 
@@ -435,19 +435,19 @@ class ChromiumGetCallersHierarchyCommand(sublime_plugin.TextCommand):
     global gLastChromeCmd
     gLastChromeCmd = self;
 
-    if not hasattr(self.view, 'chromium_utils_phantoms'):
-      self.view.chromium_utils_phantoms = sublime.PhantomSet(self.view, "chromium_utils");
+    if not hasattr(self.view, 'chromium_x_refs_phantoms'):
+      self.view.chromium_x_refs_phantoms = sublime.PhantomSet(self.view, "chromium_x_refs_phantoms");
 
-    self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+    self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
   def recall(self):
     doc = self.genHtml();
-    if not hasattr(self.view, 'chromium_utils_phantoms'):
-      self.view.chromium_utils_phantoms = sublime.PhantomSet(self.view, "chromium_utils");
+    if not hasattr(self.view, 'chromium_x_refs_phantoms'):
+      self.view.chromium_x_refs_phantoms = sublime.PhantomSet(self.view, "chromium_x_refs_phantoms");
 
-    self.view.chromium_utils_phantoms.update([self.createPhantom(doc)]);
+    self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
-class ChromiumRecallGetCallersHierarchyCommand(sublime_plugin.TextCommand):
+class ChromiumRecallXRefsCommand(sublime_plugin.TextCommand):
   def run(self, edit):
     global gLastChromeCmd
     if gLastChromeCmd:

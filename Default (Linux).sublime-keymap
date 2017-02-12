@@ -1,7 +1,7 @@
 [
   {
     "keys": ["ctrl+alt+\\"],
-    "command": "chromium_get_callers_hierarchy",
+    "command": "chromium_x_refs",
     "context":
     [
         {"key": "selector", "operator": "equal", "operand": "source.c++"}
@@ -10,7 +10,7 @@
 
   {
     "keys": ["ctrl+alt+shift+\\"],
-    "command": "chromium_recall_get_callers_hierarchy",
+    "command": "chromium_recall_x_refs",
     "context":
     [
         {"key": "selector", "operator": "equal", "operand": "source.c++"}

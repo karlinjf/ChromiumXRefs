@@ -1,10 +1,10 @@
 [
 {
-  "caption": "Chromium Callers",
-  "command": "chromium_get_callers_hierarchy"
+  "caption": "Chromium X-Refs",
+  "command": "chromium_x_refs"
 },
 {
-  "caption": "Chromium Recall Callers",
-  "command": "chromium_recall_get_callers_hierarchy"
+  "caption": "Chromium Recall X-Refs",
+  "command": "chromium_recall_x_refs"
 }
 ]
