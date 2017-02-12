@@ -388,22 +388,22 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     return body
 
   def getSignatureForSelection(self, edit):
-    self.function_name = getWord(self);
+    self.selected_word = getWord(self);
     self.file_path = posixPath(getRoot(self, self.view.file_name()));
     self.src_path = posixPath(self.view.file_name().split('src')[0]);
-    self.signature = getSignatureFor(self.file_path, self.function_name);
+    self.signature = getSignatureFor(self.file_path, self.selected_word);
     return self.signature
 
   def run(self, edit):
     self.show_tests = True;
 
     if not self.getSignatureForSelection(edit):
-      print("Could not find signature for: " + self.function_name);
+      print("Could not find signature for: " + self.selected_word);
       return;
 
     self.xrefs = getXrefsFor(self.file_path, self.signature);
     if not self.xrefs:
-      print("Could not find xrefs for: " + self.function_name);
+      print("Could not find xrefs for: " + self.selected_word);
       return;
 
     self.callers = getCallGraphFor(self.file_path, self.signature);
