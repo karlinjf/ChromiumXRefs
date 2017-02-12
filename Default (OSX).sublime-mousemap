@@ -4,7 +4,7 @@
     "count": "1",
     "modifiers": ["ctrl", "alt"],
     "press_command": "drag_select",
-    "command": "chromium_x_refs"
+    "command": "chromium_xrefs"
   },
 
   {
@@ -12,6 +12,6 @@
     "count": 1,
     "modifiers": ["ctrl", "alt"],
     "press_command": "drag_select",
-    "command": "chromium_recall_x_refs"
+    "command": "chromium_recall_xrefs"
   }
 ]
