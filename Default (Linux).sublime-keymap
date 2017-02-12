@@ -1,7 +1,7 @@
 [
   {
     "keys": ["ctrl+alt+\\"],
-    "command": "chromium_x_refs",
+    "command": "chromium_xrefs",
     "context":
     [
         {"key": "selector", "operator": "equal", "operand": "source.c++"}
@@ -10,7 +10,7 @@
 
   {
     "keys": ["ctrl+alt+shift+\\"],
-    "command": "chromium_recall_x_refs",
+    "command": "chromium_recall_xrefs",
     "context":
     [
         {"key": "selector", "operator": "equal", "operand": "source.c++"}

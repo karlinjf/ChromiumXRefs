@@ -205,7 +205,7 @@ def goToSelection(cmd, src_path, callers, sel):
     return
   goToLocation(cmd, src_path, callers[sel])
 
-class ChromiumXRefsPopupCommand(sublime_plugin.TextCommand):
+class ChromiumXrefsPopupCommand(sublime_plugin.TextCommand):
   def run(self, edit):
     function_name = getWord(self);
     file_path = getRoot(self, self.view.file_name());
@@ -224,7 +224,7 @@ class ChromiumXRefsPopupCommand(sublime_plugin.TextCommand):
     if items:
       self.view.show_popup_menu(items, lambda x: goToSelection(self, src_path, callers, x));
 
-class ChromiumXRefsCommand(sublime_plugin.TextCommand):
+class ChromiumXrefsCommand(sublime_plugin.TextCommand):
   def createPhantom(self, doc):
     loc = self.view.line(self.view.sel()[0]);
     return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
@@ -447,7 +447,7 @@ class ChromiumXRefsCommand(sublime_plugin.TextCommand):
 
     self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
-class ChromiumRecallXRefsCommand(sublime_plugin.TextCommand):
+class ChromiumRecallXrefsCommand(sublime_plugin.TextCommand):
   def run(self, edit):
     global gLastChromeCmd
     if gLastChromeCmd:

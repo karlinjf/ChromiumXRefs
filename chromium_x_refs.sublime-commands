@@ -1,10 +1,10 @@
 [
 {
   "caption": "Chromium X-Refs",
-  "command": "chromium_x_refs"
+  "command": "chromium_xrefs"
 },
 {
   "caption": "Chromium Recall X-Refs",
-  "command": "chromium_recall_x_refs"
+  "command": "chromium_recall_xrefs"
 }
 ]
