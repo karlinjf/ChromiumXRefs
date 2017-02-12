@@ -102,7 +102,7 @@ def getSignatureFor(src_file, method):
 
       elif 'internal_link' in snippet:
         signature = snippet['internal_link']['signature']
-        if '::%s' % method in signature:
+        if '::%s' % method in signature or 'class-%s' % method in signature:
           return signature
     return ''
 
@@ -132,6 +132,9 @@ def getCallGraphFor(src_file, signature):
     for child in node['children']:
       if child['signature'] == last_signature:
         continue
+      if not 'snippet_file_path' in child:
+        continue
+
       caller = {}
       caller['filename'] = child['snippet_file_path'];
       caller['line'] = child['call_site_range']['start_line']
