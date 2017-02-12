@@ -205,25 +205,6 @@ def goToSelection(cmd, src_path, callers, sel):
     return
   goToLocation(cmd, src_path, callers[sel])
 
-class ChromiumXrefsPopupCommand(sublime_plugin.TextCommand):
-  def run(self, edit):
-    function_name = getWord(self);
-    file_path = getRoot(self, self.view.file_name());
-    file_path = posixPath(file_path);
-    src_path = self.view.file_name().split('src')[0]
-    src_path = posixPath(src_path)
-
-    signature = getSignatureFor(file_path, function_name);
-    if not signature:
-      sys.exit(2);
-    callers = getCallGraphFor(file_path, signature);
-
-    items = []
-    for caller in callers:
-      items.append("%s: %s" % (caller['display_name'], caller['text']));
-    if items:
-      self.view.show_popup_menu(items, lambda x: goToSelection(self, src_path, callers, x));
-
 class ChromiumXrefsCommand(sublime_plugin.TextCommand):
   def createPhantom(self, doc):
     loc = self.view.line(self.view.sel()[0]);
@@ -276,7 +257,6 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
         cur_callers = caller['callers']
 
     if (link_type == 'target'):
-      self.view.hide_popup();
       goToLocation(self, self.src_path, caller);
     elif (link_type == 'expand'):
       caller['callers'] = getCallGraphFor(self.file_path, caller['calling_signature'])
@@ -289,12 +269,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
     elif (link_type == 'filter'):
-
       caller.pop('callers')
       doc = self.genHtml()
       self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
-
-
 
     # DO something
     link = 1
