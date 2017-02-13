@@ -355,7 +355,8 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body = """
     <style>
     body {
-      background-color: #F1F1F1;
+      background-color: color(var(--background) blend(gray 90%));
+      color: var(--foreground);
     }
     * {
       font-size: 12px;
