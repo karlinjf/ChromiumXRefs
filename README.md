@@ -4,7 +4,7 @@
 
 ### Show cross-references for a given function or variable
 - **Usage**: Ctrl+Alt+Left mouse click (or ctrl+alt+\\) on most text in the
-  C++ Chromium codebase.
+  C++ Chromium codebase. Use the command key instead of alt on OSX.
 - **Function**: Inserts a frame in the code with links to declaration,
   definition, callers, and x-refs for the given text. Click on the caller to
   jump to the code. Click on the "+" sign next to the caller to delve deeper
@@ -16,7 +16,8 @@
   you have made to the codebase will not be reflected.
 
 ### Recall last shown x-refs frame
-- **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\\) anywhere in C++ code.
+- **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\\) anywhere in C++
+  code. Use the command key instead of alt on OSX.
 - **Function**: Recalls the last x-refs frame displayed and inserts it below
   the cursor's position. You don't have to be in the same source file you were
   in when you originally displayed the hierarchy. This is useful when

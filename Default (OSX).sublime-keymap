@@ -1,0 +1,20 @@
+[
+  {
+    "keys": ["ctrl+super+\\"],
+    "command": "chromium_xrefs",
+    "context":
+    [
+        {"key": "selector", "operator": "equal", "operand": "source.c++"}
+    ],
+  },
+
+  {
+    "keys": ["ctrl+super+shift+\\"],
+    "command": "chromium_recall_xrefs",
+    "context":
+    [
+        {"key": "selector", "operator": "equal", "operand": "source.c++"}
+    ],
+  }
+]
+

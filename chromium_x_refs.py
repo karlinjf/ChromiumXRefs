@@ -353,6 +353,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
   def genHtml(self):
     body = """
+    <body id=chromium_x_refs_body>
     <style>
     body {
       background-color: color(var(--background) blend(gray 90%));
@@ -436,6 +437,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
         body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['line_text']));
       body += '</ul></ul></p>'
 
+    body += "</body>"
     return body
 
   def getSignatureForSelection(self, edit):
