@@ -334,9 +334,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       full_loc = location + [loc]
       str_loc = ','.join([str(x) for x in full_loc])
       if 'callers' in caller:
-        link_expander = "<a id=expander href=shrink:" + str_loc + '>-</a>'
+        link_expander = "<a id=chromium_x_ref_expander href=shrink:" + str_loc + '>-</a>'
       else:
-        link_expander = "<a id=expander href=expand:" + str_loc + '>+</a>'
+        link_expander = "<a id=chromium_x_ref_expander href=expand:" + str_loc + '>+</a>'
 
       calling_method = caller['display_name'].split('(')[0]
 
@@ -362,8 +362,8 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     * {
       font-size: 12px;
     }
-    #expander {
-      color: red;
+    #chromium_x_ref_expander {
+      color: var(--redish);
       padding: 5px;
     }
     ul {
@@ -376,8 +376,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       white-space: nowrap;
       list-style-type: none;
     }
-    #filter {
-      color: red;
+    #chromium_x_ref_filter {
     }
     </style>
     """
@@ -395,9 +394,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body += tab;
 
     if self.show_tests:
-      body += '<a href=filter:test>[-Tests]</a>'
+      body += '<a id=chromium_x_ref_filter href=filter:test>[-Tests]</a>'
     else:
-      body += '<a href=nofilter:test>[+Tests]</a>'
+      body += '<a id=chromium_x_ref_filter href=nofilter:test>[+Tests]</a>'
 
     body += tab
     body += '<a href=killPhantom>[X]</a>'
