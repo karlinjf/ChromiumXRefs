@@ -255,7 +255,7 @@ def goToSelection(cmd, src_path, callers, sel):
 
 class ChromiumXrefsCommand(sublime_plugin.TextCommand):
   def createPhantom(self, doc):
-    loc = self.view.line(self.view.sel()[0]);
+    loc = self.view.chromium_x_refs_phantom_loc;
     return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
 
   def processLink(self, link, callers):
@@ -475,6 +475,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     if not hasattr(self.view, 'chromium_x_refs_phantoms'):
       self.view.chromium_x_refs_phantoms = sublime.PhantomSet(self.view, "chromium_x_refs_phantoms");
 
+    self.view.chromium_x_refs_phantom_loc = self.view.line(self.view.sel()[0]);
     self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
   def recall(self):
@@ -482,6 +483,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     if not hasattr(self.view, 'chromium_x_refs_phantoms'):
       self.view.chromium_x_refs_phantoms = sublime.PhantomSet(self.view, "chromium_x_refs_phantoms");
 
+    self.view.chromium_x_refs_phantom_loc = self.view.line(self.view.sel()[0]);
     self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
 class ChromiumRecallXrefsCommand(sublime_plugin.TextCommand):
