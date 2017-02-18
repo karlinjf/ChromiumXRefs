@@ -358,6 +358,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body {
       background-color: color(var(--background) blend(gray 90%));
       color: var(--foreground);
+      border-radius: 5pt;
     }
     * {
       font-size: 12px;
@@ -376,7 +377,10 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       white-space: nowrap;
       list-style-type: none;
     }
-    #chromium_x_ref_filter {
+    #hline {
+      background-color: color(var(--foreground) blend(gray 10%);
+      font-size: 1px;
+      margin-top: 4px;
     }
     </style>
     """
@@ -401,6 +405,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body += tab
     body += '<a href=killPhantom>[X]</a>'
     body += "</div>"
+
+    # Add a horizontal line
+    body += '<div id=hline>.</div>'
 
     if self.callers:
       body += '<p><b>Callers:</b><br>'
