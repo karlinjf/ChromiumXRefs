@@ -26,9 +26,10 @@
 
 
 ### Suggested mouse mapping
-- It's not a good idea to set default mouse mappings in a plugin as there is a
-  high chance of mapping conflit. So instead, I've put a suggestion here to
-  make it easy:
+- A mouse mapping is quite useful for this plugin. Paste the following in your
+  "Default (OS).sublime-mousemap" file in your User/ directory. Replace "OS"
+  with one of Windows, OSX, or Linux. Then you should be able to get x-refs
+  with a ctrl+alt + left mouse click.
 ```json
 [
   {
@@ -41,7 +42,7 @@
 
   {
     "button": "button2",
-    "count": 1,
+    "count": "1",
     "modifiers": ["ctrl", "alt"],
     "press_command": "drag_select",
     "command": "chromium_recall_xrefs"
