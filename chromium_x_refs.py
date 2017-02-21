@@ -241,7 +241,23 @@ def posixPath(path):
   return path;
 
 def getRoot(cmd, path):
-  return 'src' + path.split('src')[1]
+  src_split = path.split('src')
+  src_count = len(src_split)
+  if src_count < 2:
+    return ''
+  if src_count == 2:
+    return 'src' + path.split('src')[1]
+
+  # There are multiple 'src' directories in the path, figure out which one is
+  # the root of the tree by taking the closest to the filesystem root with a
+  # .git subdirectory.
+  rootPath = ''
+  for partial in src_split:
+    rootPath += partial
+    rootPath += 'src'
+    if os.path.isdir(rootPath + '/.git'):
+      return 'src' + path.split(rootPath)[1]
+  return ''
 
 def goToLocation(cmd, src_path, caller):
   line = caller['line'];
@@ -449,7 +465,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
   def getSignatureForSelection(self, edit):
     self.selected_word = getWord(self);
     self.file_path = posixPath(getRoot(self, self.view.file_name()));
-    self.src_path = posixPath(self.view.file_name().split('src')[0]);
+    self.src_path = posixPath(self.view.file_name().split(self.file_path)[0]);
     self.signature = getSignatureFor(self.file_path, self.selected_word);
     return self.signature
 
