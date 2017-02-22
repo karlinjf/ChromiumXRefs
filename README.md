@@ -1,6 +1,6 @@
 # Chromium X-Refs Plugin for Sublime Text
 
-![Screenshot](/images/chromium_x_refs.png)
+![Screenshot](/media/chromium_x_refs.gif)
 
 ### Show cross-references for a given function or variable
 - **Command**: Chromium X-Refs
