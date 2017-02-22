@@ -3,6 +3,7 @@
 ![Screenshot](/images/chromium_x_refs.png)
 
 ### Show cross-references for a given function or variable
+- **Command**: Chromium X-Refs
 - **Usage**: Ctrl+Alt+Left mouse click (or ctrl+alt+\\) on most text in the
   C++ Chromium codebase. Use the command key instead of alt on OSX.
 - **Function**: Inserts a frame in the code with links to declaration,
@@ -16,6 +17,7 @@
   you have made to the codebase will not be reflected.
 
 ### Recall last shown x-refs frame
+- **Command**: Chromium Recall X-Refs
 - **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\\) anywhere in C++
   code. Use the command key instead of alt on OSX.
 - **Function**: Recalls the last x-refs frame displayed and inserts it below
