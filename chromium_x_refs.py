@@ -464,8 +464,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
   def getSignatureForSelection(self, edit):
     self.selected_word = getWord(self);
-    self.file_path = posixPath(getRoot(self, self.view.file_name()));
+    self.file_path = getRoot(self, self.view.file_name());
     self.src_path = posixPath(self.view.file_name().split(self.file_path)[0]);
+    self.file_path = posixPath(self.file_path)
     self.signature = getSignatureFor(self.file_path, self.selected_word);
     return self.signature
 
