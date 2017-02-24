@@ -9,7 +9,8 @@ import sys
 
 import sublime, sublime_plugin
 
-import ChromiumXRefs.chromium_code_search as cs
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+import chromium_code_search as cs
 
 gLastChromeCmd = None  # The last chromium cmd that ran
 
