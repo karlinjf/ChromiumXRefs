@@ -12,11 +12,12 @@ import sublime, sublime_plugin
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 import chromium_code_search as cs
 
-gLastChromeCmd = None  # The last chromium cmd that ran
 
 # TODO store the phantom's location so that update calls can use the same location
 # TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
 
+
+gLastChromeCmd = None  # The last chromium cmd that ran
 cs.cacheResponses(True);
 
 def getWord(cmd):

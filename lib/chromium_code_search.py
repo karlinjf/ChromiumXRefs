@@ -1,6 +1,8 @@
+import argparse
 import datetime
 import getopt
 import json
+import sys
 import tempfile
 import threading
 import time
@@ -221,5 +223,37 @@ def getRefsFor(src_file, signature):
     return output
 
 
+def logAndExit(msg):
+  print(msg);
+  sys.exit(2);
+
+def printHelpAndExit(msg):
+  print("HI");
+  sys.exit(2);
+
 if __name__ == "__main__":
-  print("Hi!")
+  parser = argparse.ArgumentParser(description='Searches Chromium Code Search for X-Refs.')
+  parser.add_argument('-p', '--path',
+                      help='The path to this file starting with src/')
+  parser.add_argument('-w', '--word',
+                      help='The word to search for. --path must also be specified.')
+  parser.add_argument('-s', '--signature',
+                      help='A signature provided from a previous search.')
+  args = parser.parse_args()
+
+  if bool(args.path) ^ bool(args.word):
+    print("Both path and word must be supplied");
+    sys.exit(2);
+
+  results = {}
+
+  if args.word:
+    signature = getSignatureFor(args.path, args.word);
+    results['signature'] = signature
+    if not signature:
+      logAndExit("Could not find signature for %s" % (args.word))
+
+  results['xrefs'] = getXrefsFor(args.path, signature);
+  results['callers'] = getCallGraphFor(args.path, signature);
+
+  print(json.dumps(results))
