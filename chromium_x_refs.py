@@ -44,7 +44,7 @@ class FileCache:
     return f.read();
 
   def gc(self):
-    threading.Timer(5, self.gc).start();
+    threading.Timer(15 * 60, self.gc).start();
     expired = datetime.datetime.now() - datetime.timedelta(minutes=30);
     remove = []
     for url, (f, timestamp) in self.store.items():
