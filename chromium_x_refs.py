@@ -116,7 +116,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     if (link_type == 'target'):
       goToLocation(self, self.src_path, caller);
     elif (link_type == 'expand'):
-      caller['callers'] = cs.getCallGraphFor(self.file_path, caller['calling_signature'])
+      caller['callers'] = cs.getCallGraphFor(caller['calling_signature'])
       doc = self.genHtml()
       self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
 
@@ -277,12 +277,12 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       self.log("Could not find signature for: " + self.selected_word);
       return;
 
-    self.xrefs = cs.getXrefsFor(self.file_path, self.signature);
+    self.xrefs = cs.getXrefsFor(self.signature);
     if not self.xrefs:
       self.log("Could not find xrefs for: " + self.selected_word);
       return;
 
-    self.callers = cs.getCallGraphFor(self.file_path, self.signature);
+    self.callers = cs.getCallGraphFor(self.signature);
 
     doc = self.genHtml();
 

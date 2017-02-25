@@ -101,17 +101,17 @@ def getSignatureFor(src_file, method):
           return signature
     return ''
 
-def getCallGraphFor(src_file, signature):
+def getCallGraphFor(signature):
     url = ('https://cs.chromium.org/codesearch/json'
          '?call_graph_request=b'
          '&signature={signature}'
          '&file_spec=b'
          '&package_name=chromium'
-         '&name={file_name}'
+         '&name=.'
          '&file_spec=e'
          '&max_num_results=500'
          '&call_graph_request=e')
-    url = url.format(signature=urllib.parse.quote(signature, safe=''), file_name=urllib.parse.quote(src_file, safe=''))
+    url = url.format(signature=urllib.parse.quote(signature, safe=''))
 
     result = retrieve(url);
     if not result:
@@ -149,17 +149,18 @@ def getRefForMatch(filename, match):
   return ref;
 
 
-def getXrefsFor(src_file, signature):
+def getXrefsFor(signature):
     url = ('https://cs.chromium.org/codesearch/json'
            '?xref_search_request=b'
            '&query={signature}'
            '&file_spec=b'
+           '&name=.'
            '&package_name=chromium'
-           '&name={file_name}'
            '&file_spec=e'
            '&max_num_results=500'
            '&xref_search_request=e')
-    url = url.format(signature=urllib.parse.quote(signature, safe=''), file_name=urllib.parse.quote(src_file, safe=''))
+    url = url.format(signature=urllib.parse.quote(signature, safe=''))
+    print(url)
     result = retrieve(url);
     if not result:
       sys.exit(2);
@@ -187,42 +188,6 @@ def getXrefsFor(src_file, signature):
                 xrefs['references'].append(getRefForMatch(filename, match));
     return xrefs
 
-def getRefsFor(src_file, signature):
-    url = ('https://cs.chromium.org/codesearch/json'
-           '?xref_search_request=b'
-           '&query={signature}'
-           '&file_spec=b'
-           '&package_name=chromium'
-           '&name={file_name}'
-           '&file_spec=e'
-           '&max_num_results=500'
-           '&xref_search_request=e')
-    url = url.format(signature=urllib.parse.quote(signature, safe=''), file_name=urllib.parse.quote(src_file, safe=''))
-    result = retrieve(url);
-    if not result:
-      sys.exit(2);
-
-    result = json.loads(result)['xref_search_response'][0]
-    status = result['status']
-    if not 'search_result' in result:
-        sys.exit(2)
-    search_results = result['search_result']
-
-    output = []
-
-    for file_result in search_results:
-        filename = file_result['file']['name']
-        for match in file_result['match']:
-            if not (match['type'] == 'REFERENCED_AT'):
-                continue
-
-            line = match['line_number']
-            text = match['line_text']
-            output.append({'filename': filename, 'line': line, 'text': text})
-
-    return output
-
-
 def logAndExit(msg):
   print(msg);
   sys.exit(2);
@@ -236,24 +201,27 @@ if __name__ == "__main__":
   parser.add_argument('-p', '--path',
                       help='The path to this file starting with src/')
   parser.add_argument('-w', '--word',
-                      help='The word to search for. --path must also be specified.')
+                      help='The word to search for in the file denoted by the path argument. You must also specify -p')
   parser.add_argument('-s', '--signature',
-                      help='A signature provided from a previous search.')
+                      help='A signature provided from a previous search. No -p or -w arguments required.')
   args = parser.parse_args()
 
-  if bool(args.path) ^ bool(args.word):
-    print("Both path and word must be supplied");
-    sys.exit(2);
 
+  signature = args.signature;
   results = {}
 
-  if args.word:
+
+  if not signature:
+    if bool(args.path) ^ bool(args.word):
+      print("Both path and word must be supplied if one is supplied");
+      sys.exit(2);
+
     signature = getSignatureFor(args.path, args.word);
     results['signature'] = signature
     if not signature:
       logAndExit("Could not find signature for %s" % (args.word))
 
-  results['xrefs'] = getXrefsFor(args.path, signature);
-  results['callers'] = getCallGraphFor(args.path, signature);
+  results['xrefs'] = getXrefsFor(signature);
+  results['callers'] = getCallGraphFor(signature);
 
   print(json.dumps(results))
