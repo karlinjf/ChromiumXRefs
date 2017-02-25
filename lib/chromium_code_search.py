@@ -160,7 +160,6 @@ def getXrefsFor(signature):
            '&max_num_results=500'
            '&xref_search_request=e')
     url = url.format(signature=urllib.parse.quote(signature, safe=''))
-    print(url)
     result = retrieve(url);
     if not result:
       sys.exit(2);
