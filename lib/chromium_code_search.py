@@ -195,10 +195,6 @@ def logAndExit(msg):
   print(msg);
   sys.exit(2);
 
-def printHelpAndExit(msg):
-  print("HI");
-  sys.exit(2);
-
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Searches Chromium Code Search for X-Refs.')
   parser.add_argument('-p', '--path',
