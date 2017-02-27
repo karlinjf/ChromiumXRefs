@@ -1,3 +1,7 @@
+# Copyright 2017 Josh Karlin. All rights reserved.
+# Use of this source code is governed by the Apache license found in the LICENSE
+# file.
+
 import argparse
 import datetime
 import getopt
