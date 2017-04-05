@@ -78,8 +78,10 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
   def updatePhantom(self, phantom):
     xref_data = self.data[self.view.window().id()];
+    if phantom is None:
+      xref_data['phantom_set'].update([])
+      return
     xref_data['phantom_set'].update([phantom])
-
 
   def processLink(self, link, callers):
     link_type = link.split(':')[0]
@@ -114,7 +116,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
         return;
 
     if link_type == 'killPhantom':
-      g_xrefs_phantoms.update([])
+      self.updatePhantom(None)
       return;
 
     str_loc = link.split(':')[1]
