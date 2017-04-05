@@ -300,10 +300,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     g_last_xref_cmd = self;
 
     if not g_xrefs_panel:
-      g_xrefs_panel = window.create_output_panel("chromium_x_refs", True);
+      g_xrefs_panel = window.create_output_panel("chromium_x_refs", False);
     if not g_xrefs_phantoms:
       g_xrefs_phantoms = sublime.PhantomSet(g_xrefs_panel, "phantoms");
-
 
     g_xrefs_phantoms.update([self.createPhantom(doc)]);
     window.run_command("show_panel", {"panel": "output.chromium_x_refs"})
