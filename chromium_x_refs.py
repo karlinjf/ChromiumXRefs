@@ -17,7 +17,10 @@ import chromium_code_search as cs
 # TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
 
 
-gLastChromeCmd = None  # The last chromium cmd that ran
+g_last_xref_cmd = None  # The last chromium cmd that ran
+g_xrefs_panel = None
+g_xrefs_phantoms = None
+
 cs.cacheResponses(True);
 
 def getWord(cmd):
@@ -63,11 +66,16 @@ def goToSelection(cmd, src_path, callers, sel):
   goToLocation(cmd, src_path, callers[sel])
 
 class ChromiumXrefsCommand(sublime_plugin.TextCommand):
+
   def createPhantom(self, doc):
-    loc = self.view.chromium_x_refs_phantom_loc;
+    global g_xrefs_panel;
+    loc = g_xrefs_panel.sel()[0]
     return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
 
+
   def processLink(self, link, callers):
+    global g_xrefs_phantoms;
+
     link_type = link.split(':')[0]
 
     if link_type == 'declared':
@@ -89,18 +97,18 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       if link.split(':')[1] == 'test':
         self.show_tests = False;
         doc = self.genHtml();
-        self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+        g_xrefs_phantoms.update([self.createPhantom(doc)]);
         return;
 
     if link_type == 'nofilter':
       if link.split(':')[1] == 'test':
         self.show_tests = True;
         doc = self.genHtml()
-        self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+        g_xrefs_phantoms.update([self.createPhantom(doc)]);
         return;
 
     if link_type == 'killPhantom':
-      self.view.chromium_x_refs_phantoms.update([])
+      g_xrefs_phantoms.update([])
       return;
 
     str_loc = link.split(':')[1]
@@ -118,17 +126,17 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     elif (link_type == 'expand'):
       caller['callers'] = cs.getCallGraphFor(caller['calling_signature'])
       doc = self.genHtml()
-      self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+      g_xrefs_phantoms.update([self.createPhantom(doc)]);
 
     elif (link_type == 'shrink'):
       caller.pop('callers')
       doc = self.genHtml()
-      self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+      g_xrefs_phantoms.update([self.createPhantom(doc)]);
 
     elif (link_type == 'filter'):
       caller.pop('callers')
       doc = self.genHtml()
-      self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+      g_xrefs_phantoms.update([self.createPhantom(doc)]);
 
     # DO something
     link = 1
@@ -286,27 +294,31 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
     doc = self.genHtml();
 
-    global gLastChromeCmd
-    gLastChromeCmd = self;
+    window = self.view.window();
 
-    if not hasattr(self.view, 'chromium_x_refs_phantoms'):
-      self.view.chromium_x_refs_phantoms = sublime.PhantomSet(self.view, "chromium_x_refs_phantoms");
+    global g_last_xref_cmd, g_xrefs_panel, g_xrefs_phantoms
+    g_last_xref_cmd = self;
 
-    self.view.chromium_x_refs_phantom_loc = self.view.line(self.view.sel()[0]);
-    self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+    if not g_xrefs_panel:
+      g_xrefs_panel = window.create_output_panel("chromium_x_refs", True);
+    if not g_xrefs_phantoms:
+      g_xrefs_phantoms = sublime.PhantomSet(g_xrefs_panel, "phantoms");
+
+
+    g_xrefs_phantoms.update([self.createPhantom(doc)]);
+    window.run_command("show_panel", {"panel": "output.chromium_x_refs"})
 
   def recall(self):
     doc = self.genHtml();
-    if not hasattr(self.view, 'chromium_x_refs_phantoms'):
-      self.view.chromium_x_refs_phantoms = sublime.PhantomSet(self.view, "chromium_x_refs_phantoms");
+    global g_xrefs_panel, g_xrefs_phantoms
 
-    self.view.chromium_x_refs_phantom_loc = self.view.line(self.view.sel()[0]);
-    self.view.chromium_x_refs_phantoms.update([self.createPhantom(doc)]);
+    g_xrefs_phantoms.update([self.createPhantom(doc)]);
+    window = self.view.window();
+    window.run_command("show_panel", {"panel": "output.chromium_x_refs"})
 
 class ChromiumRecallXrefsCommand(sublime_plugin.TextCommand):
   def run(self, edit):
-    global gLastChromeCmd
-    if gLastChromeCmd:
-      gLastChromeCmd.view = self.view;
-      gLastChromeCmd.recall();
+    global g_last_xref_cmd
+    if g_last_xref_cmd:
+      g_last_xref_cmd.recall();
 
