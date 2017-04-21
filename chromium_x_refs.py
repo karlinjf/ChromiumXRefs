@@ -18,8 +18,6 @@ import chromium_code_search as cs
 
 
 g_last_xref_cmd = None  # The last chromium cmd that ran
-g_xrefs_panel = None
-g_xrefs_phantoms = None
 
 cs.cacheResponses(True);
 
@@ -66,22 +64,24 @@ def goToSelection(cmd, src_path, callers, sel):
   goToLocation(cmd, src_path, callers[sel])
 
 class ChromiumXrefsCommand(sublime_plugin.TextCommand):
-
   def __init__(self, view):
     self.view = view;
     self.data = {}
 
   def createPhantom(self, doc):
     xref_data = self.data[self.view.window().id()];
-    loc = xref_data['panel'].sel()[0];
+    loc = sublime.Region(0,0);
     return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
 
   def updatePhantom(self, phantom):
+
     xref_data = self.data[self.view.window().id()];
-    if phantom is None:
-      xref_data['phantom_set'].update([])
-      return
     xref_data['phantom_set'].update([phantom])
+
+  def destroyPhantom(self):
+    xref_data = self.data[self.view.window().id()];
+    xref_data['phantom_set'].update([])
+    self.view.window().run_command("hide_panel", {"panel": "output.chromium_x_refs"})
 
   def processLink(self, link, callers):
     link_type = link.split(':')[0]
@@ -116,7 +116,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
         return;
 
     if link_type == 'killPhantom':
-      self.updatePhantom(None)
+      self.destroyPhantom();
       return;
 
     str_loc = link.split(':')[1]
@@ -286,6 +286,15 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       print(msg);
       self.view.window().status_message(msg);
 
+  def initWindow(self, window):
+    if not window.id() in self.data:
+      self.data[window.id()] = {}
+      xref_data = self.data[window.id()];
+      window.destroy_output_panel("chromium_x_refs");
+      xref_data['panel'] = window.create_output_panel("chromium_x_refs", False);
+      xref_data['phantom_set'] = sublime.PhantomSet(xref_data['panel'], "phantoms");
+
+
   def run(self, edit):
     self.show_tests = True;
 
@@ -303,12 +312,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     doc = self.genHtml();
 
     window = self.view.window();
-    if not window.id() in self.data:
-      self.data[window.id()] = {}
-      xref_data = self.data[window.id()];
-      xref_data['panel'] = window.create_output_panel("chromium_x_refs", False);
-      xref_data['phantom_set'] = sublime.PhantomSet(xref_data['panel'], "phantoms");
-
+    self.initWindow(window);
 
     global g_last_xref_cmd
     g_last_xref_cmd = self;
@@ -316,9 +320,11 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     self.updatePhantom(self.createPhantom(doc));
     window.run_command("show_panel", {"panel": "output.chromium_x_refs"})
 
+
   def recall(self):
+    window = self.view.window();
+    self.initWindow(window);
     doc = self.genHtml();
-    global g_xrefs_panel
 
     self.updatePhantom(self.createPhantom(doc));
     window = self.view.window();
