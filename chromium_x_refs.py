@@ -21,14 +21,6 @@ g_last_xref_cmd = None  # The last chromium cmd that ran
 
 cs.cacheResponses(True);
 
-def getWord(cmd):
-  for region in cmd.view.sel():
-    if region.empty():
-        # if we have no selection grab the current word
-        word = cmd.view.word(region)
-        if not word.empty():
-            return cmd.view.substr(word)
-
 def posixPath(path):
   if os.path.sep == '\\':
     return path.replace('\\','/');
@@ -68,6 +60,15 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     self.view = view;
     self.data = {}
 
+  def getWord(self):
+    for region in self.view.sel():
+      if region.empty():
+          # if we have no selection grab the current word
+          word = self.view.word(region)
+          if not word.empty():
+              self.selection_line = self.view.rowcol(region.a)[0]+1;
+              return self.view.substr(word)
+
   def createPhantom(self, doc):
     xref_data = self.data[self.view.window().id()];
     loc = sublime.Region(0,0);
@@ -85,6 +86,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
   def processLink(self, link, callers):
     link_type = link.split(':')[0]
+
+    if link_type == 'selected_word':
+      goToLocation(self, self.src_path, self.selection_ref);
 
     if link_type == 'declared':
       goToLocation(self, self.src_path, self.xrefs['declaration']);
@@ -214,7 +218,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body += "<div class=navbar>";
     xrefs = self.xrefs;
 
-    body += '<b>' + self.selected_word + ':</b>' + tab
+    body += '<b> <a href=selected_word>' + self.selected_word + '</a>:</b>' + tab
     if 'declaration' in xrefs:
       body += '<a href=declared:>Declaration</a>' + tab
     if 'definition' in xrefs:
@@ -272,13 +276,16 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     return body
 
   def getSignatureForSelection(self, edit):
-    self.selected_word = getWord(self);
+    self.selected_word = self.getWord();
     self.file_path = getRoot(self, self.view.file_name());
     if self.file_path == '':
       self.log("Could not find src/ directory in path");
       return '';
     self.src_path = posixPath(self.view.file_name().split(self.file_path)[0]);
     self.file_path = posixPath(self.file_path)
+
+    self.selection_ref = {'line': self.selection_line, 'filename': self.file_path}
+
     self.signature = cs.getSignatureFor(self.file_path, self.selected_word);
     return self.signature
 
