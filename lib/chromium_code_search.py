@@ -87,7 +87,7 @@ def getSignatureFor(src_file, method):
 
     result = retrieve(url);
     if not result:
-      sys.exit(2);
+      return {}
 
     result = json.loads(result)['annotation_response'][0]
 
@@ -119,7 +119,7 @@ def getCallGraphFor(signature):
 
     result = retrieve(url);
     if not result:
-      sys.exit(2);
+      return {}
 
     result = json.loads(result)['call_graph_response'][0];
     node = result['node'];
@@ -165,8 +165,9 @@ def getXrefsFor(signature):
            '&xref_search_request=e')
     url = url.format(signature=urllib.parse.quote(signature, safe=''))
     result = retrieve(url);
+
     if not result:
-      sys.exit(2);
+      return {}
 
     result = json.loads(result)['xref_search_response'][0]
     status = result['status']

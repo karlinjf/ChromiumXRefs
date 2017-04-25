@@ -65,6 +65,17 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       if region.empty():
           # if we have no selection grab the current word
           word = self.view.word(region)
+
+          # grab the word plus two characters before it
+          word_plus = sublime.Region(word.a, word.b)
+          word_plus.a -= 1;
+          str_word_plus = self.view.substr(word_plus)
+          print("region = %d:%d" % (word.a, word.b))
+          print("region = %d:%d" % (word_plus.a, word_plus.b))
+          print("word_plus = %s" % str_word_plus)
+          if str_word_plus.startswith(":") or str_word_plus.startswith("~"):
+            word = word_plus
+
           if not word.empty():
               self.selection_line = self.view.rowcol(region.a)[0]+1;
               return self.view.substr(word)
@@ -313,6 +324,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     if not self.xrefs:
       self.log("Could not find xrefs for: " + self.selected_word);
       return;
+    return "okay";
 
     self.callers = cs.getCallGraphFor(self.signature);
 
