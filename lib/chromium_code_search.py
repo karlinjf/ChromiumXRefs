@@ -87,7 +87,7 @@ def getSignatureFor(src_file, method):
 
     result = retrieve(url);
     if not result:
-      return {}
+      return ''
 
     result = json.loads(result)['annotation_response'][0]
 
