@@ -9,9 +9,7 @@ import sys
 
 import sublime, sublime_plugin
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-import chromium_code_search as cs
-
+from ChromiumXRefs.lib import chromium_code_search as cs
 
 # TODO store the phantom's location so that update calls can use the same location
 # TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
@@ -70,9 +68,6 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
           word_plus = sublime.Region(word.a, word.b)
           word_plus.a -= 1;
           str_word_plus = self.view.substr(word_plus)
-          print("region = %d:%d" % (word.a, word.b))
-          print("region = %d:%d" % (word_plus.a, word_plus.b))
-          print("word_plus = %s" % str_word_plus)
           if str_word_plus.startswith(":") or str_word_plus.startswith("~"):
             word = word_plus
 
@@ -324,7 +319,6 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     if not self.xrefs:
       self.log("Could not find xrefs for: " + self.selected_word);
       return;
-    return "okay";
 
     self.callers = cs.getCallGraphFor(self.signature);
 
