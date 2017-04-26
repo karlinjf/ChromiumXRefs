@@ -61,9 +61,21 @@ def retrieve(url):
     cached_response = gFileCache.get(url);
     if (cached_response):
       return cached_response.decode('utf8');
+
+  response = None
+
   try:
-    response = urllib.request.urlopen(url, timeout=3)
-  except:
+    if len(url) > 1500:
+      short_url = url.split('?')[0]
+      data = url.split('?')[1]
+      print("url = %s" % url);
+      print("Short url = %s" % short_url)
+      print("data = %s" % data)
+      response = urllib.request.urlopen(short_url, data=data.encode('utf-8'), timeout=3)
+    else:
+      response = urllib.request.urlopen(url, timeout=3)
+
+  except error:
     return ''
   result = response.read()
   if gFileCache:

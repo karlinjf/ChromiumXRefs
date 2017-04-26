@@ -14,7 +14,6 @@ from ChromiumXRefs.lib import chromium_code_search as cs
 # TODO store the phantom's location so that update calls can use the same location
 # TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
 
-
 g_last_xref_cmd = None  # The last chromium cmd that ran
 
 cs.cacheResponses(True);
@@ -293,7 +292,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     self.selection_ref = {'line': self.selection_line, 'filename': self.file_path}
 
     self.signature = cs.getSignatureFor(self.file_path, self.selected_word);
-    return self.signature
+    return self.signature != ''
 
   def log(self, msg):
       print(msg);
