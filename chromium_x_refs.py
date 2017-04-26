@@ -9,7 +9,11 @@ import sys
 
 import sublime, sublime_plugin
 
-from ChromiumXRefs.lib import chromium_code_search as cs
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+import chromium_code_search as cs
+
+# Use the below once the respository is renamed:
+#from ChromiumXRefs.lib import chromium_code_search as cs
 
 # TODO store the phantom's location so that update calls can use the same location
 # TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
