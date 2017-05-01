@@ -94,6 +94,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
     if link_type == 'selected_word':
       goToLocation(self, self.src_path, self.selection_ref);
+      return;
 
     if link_type == 'declared':
       goToLocation(self, self.src_path, self.xrefs['declaration']);
