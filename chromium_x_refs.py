@@ -34,8 +34,6 @@ import sublime, sublime_plugin
 
 # =============== CODESEARCH CODE ===================
 
-gFileCache = None;
-
 # A key/value store that stores objects to disk in temporary objects
 # for 30 minutes.
 class FileCache:
@@ -65,170 +63,163 @@ class FileCache:
     for url in remove:
       self.store.pop(url);
 
-def cacheResponses(should_cache):
-  global gFileCache
-  if not should_cache:
-    gFileCache = None;
-    return
-  if gFileCache:
-    return
-  gFileCache = FileCache();
+class CodeSearch:
+  def __init__(self, should_cache):
+    self.cache = None
+    if should_cache:
+      self.cache = FileCache();
 
-# Retrieve the url by first trying to cache and falling back to the network.
-def retrieve(url):
-  global gFileCache
+  # Retrieve the url by first trying to cache and falling back to the network.
+  def retrieve(self, url):
+    if self.cache:
+      cached_response = self.cache.get(url);
+      if (cached_response):
+        return cached_response.decode('utf8');
 
-  if gFileCache:
-    cached_response = gFileCache.get(url);
-    if (cached_response):
-      return cached_response.decode('utf8');
+    response = None
 
-  response = None
+    try:
+      if len(url) > 1500:
+        short_url = url.split('?')[0]
+        data = url.split('?')[1]
+        response = urllib.request.urlopen(short_url, data=data.encode('utf-8'), timeout=3)
+      else:
+        response = urllib.request.urlopen(url, timeout=3)
 
-  try:
-    if len(url) > 1500:
-      short_url = url.split('?')[0]
-      data = url.split('?')[1]
-      response = urllib.request.urlopen(short_url, data=data.encode('utf-8'), timeout=3)
-    else:
-      response = urllib.request.urlopen(url, timeout=3)
+    except error:
+      return ''
+    result = response.read()
+    if self.cache:
+      self.cache.put(url, result);
+    return result.decode('utf8');
 
-  except error:
-    return ''
-  result = response.read()
-  if gFileCache:
-    gFileCache.put(url, result);
-  return result.decode('utf8');
+  def getSignatureFor(self, src_file, method):
+      url = ('https://cs.chromium.org/codesearch/json'
+             '?annotation_request=b'
+             '&file_spec=b'
+             '&package_name=chromium'
+             '&name={file_name}'
+             '&file_spec=e'
+             '&type=b'
+             '&id=1'
+             '&type=e'
+             '&label='
+             '&follow_branches=false'
+             '&annotation_request=e')
+      url = url.format(file_name=urllib.parse.quote(src_file, safe=''))
 
-def getSignatureFor(src_file, method):
-    url = ('https://cs.chromium.org/codesearch/json'
-           '?annotation_request=b'
-           '&file_spec=b'
-           '&package_name=chromium'
-           '&name={file_name}'
-           '&file_spec=e'
-           '&type=b'
-           '&id=1'
-           '&type=e'
-           '&label='
-           '&follow_branches=false'
-           '&annotation_request=e')
-    url = url.format(file_name=urllib.parse.quote(src_file, safe=''))
+      result = self.retrieve(url);
+      if not result:
+        return ''
 
-    result = retrieve(url);
-    if not result:
+      result = json.loads(result)['annotation_response'][0]
+
+      for snippet in result.get('annotation', []):
+        if not 'type' in snippet:
+          continue
+        if 'xref_signature' in snippet:
+          signature = snippet['xref_signature']['signature']
+          if '%s(' % method in signature:
+            return signature
+
+        elif 'internal_link' in snippet:
+          signature = snippet['internal_link']['signature']
+          if '::%s' % method in signature or 'class-%s' % method in signature:
+            return signature
       return ''
 
-    result = json.loads(result)['annotation_response'][0]
-
-    for snippet in result.get('annotation', []):
-      if not 'type' in snippet:
-        continue
-      if 'xref_signature' in snippet:
-        signature = snippet['xref_signature']['signature']
-        if '%s(' % method in signature:
-          return signature
-
-      elif 'internal_link' in snippet:
-        signature = snippet['internal_link']['signature']
-        if '::%s' % method in signature or 'class-%s' % method in signature:
-          return signature
-    return ''
-
-def getCallGraphFor(signature):
-    url = ('https://cs.chromium.org/codesearch/json'
-         '?call_graph_request=b'
-         '&signature={signature}'
-         '&file_spec=b'
-         '&package_name=chromium'
-         '&name=.'
-         '&file_spec=e'
-         '&max_num_results=500'
-         '&call_graph_request=e')
-    url = url.format(signature=urllib.parse.quote(signature, safe=''))
-
-    result = retrieve(url);
-    if not result:
-      return {}
-
-    result = json.loads(result)['call_graph_response'][0];
-    node = result['node'];
-
-    callers = [];
-    last_signature = ''
-    if not 'children' in node:
-      return callers
-    for child in node['children']:
-      if child['signature'] == last_signature:
-        continue
-      if not 'snippet_file_path' in child:
-        continue
-
-      caller = {}
-      caller['filename'] = child['snippet_file_path'];
-      caller['line'] = child['call_site_range']['start_line']
-      caller['col'] = child['call_site_range']['start_column']
-      caller['text'] = child['snippet']['text']['text']
-      caller['calling_method'] = child['identifier']
-      caller['calling_signature'] = child['signature']
-      last_signature = child['signature']
-      caller['display_name'] = child['display_name']
-      callers.append(caller)
-    return callers
-
-def getRefForMatch(filename, match):
-  ref = {'filename': filename, 'line': match['line_number'], 'signature': match['signature']}
-  if 'line_text' in match:
-    ref['line_text'] = match['line_text']
-  return ref;
-
-
-def getXrefsFor(signature):
-    url = ('https://cs.chromium.org/codesearch/json'
-           '?xref_search_request=b'
-           '&query={signature}'
+  def getCallGraphFor(self, signature):
+      url = ('https://cs.chromium.org/codesearch/json'
+           '?call_graph_request=b'
+           '&signature={signature}'
            '&file_spec=b'
-           '&name=.'
            '&package_name=chromium'
+           '&name=.'
            '&file_spec=e'
            '&max_num_results=500'
-           '&xref_search_request=e')
-    url = url.format(signature=urllib.parse.quote(signature, safe=''))
-    result = retrieve(url);
+           '&call_graph_request=e')
+      url = url.format(signature=urllib.parse.quote(signature, safe=''))
 
-    if not result:
-      return {}
-
-    result = json.loads(result)['xref_search_response'][0]
-    status = result['status']
-    if not 'search_result' in result:
+      result = self.retrieve(url);
+      if not result:
         return {}
-    search_results = result['search_result']
 
-    xrefs = {}
+      result = json.loads(result)['call_graph_response'][0];
+      node = result['node'];
 
-    for file_result in search_results:
-        filename = file_result['file']['name']
-        for match in file_result['match']:
-            if match['type'] == 'HAS_DEFINITION':
-                xrefs['definition'] = getRefForMatch(filename, match);
-            elif match['type'] == 'HAS_DECLARATION':
-                xrefs['declaration'] = getRefForMatch(filename, match);
-            elif match['type'] == 'OVERRIDDEN_BY':
-                xrefs.setdefault('overrides', []);
-                xrefs['overrides'].append(getRefForMatch(filename, match));
-            elif match['type'] == 'REFERENCED_AT':
-                xrefs.setdefault('references', []);
-                xrefs['references'].append(getRefForMatch(filename, match));
-    return xrefs
+      callers = [];
+      last_signature = ''
+      if not 'children' in node:
+        return callers
+      for child in node['children']:
+        if child['signature'] == last_signature:
+          continue
+        if not 'snippet_file_path' in child:
+          continue
+
+        caller = {}
+        caller['filename'] = child['snippet_file_path'];
+        caller['line'] = child['call_site_range']['start_line']
+        caller['col'] = child['call_site_range']['start_column']
+        caller['text'] = child['snippet']['text']['text']
+        caller['calling_method'] = child['identifier']
+        caller['calling_signature'] = child['signature']
+        last_signature = child['signature']
+        caller['display_name'] = child['display_name']
+        callers.append(caller)
+      return callers
+
+  def getRefForMatch(self, filename, match):
+    ref = {'filename': filename, 'line': match['line_number'], 'signature': match['signature']}
+    if 'line_text' in match:
+      ref['line_text'] = match['line_text']
+    return ref;
+
+
+  def getXrefsFor(self, signature):
+      url = ('https://cs.chromium.org/codesearch/json'
+             '?xref_search_request=b'
+             '&query={signature}'
+             '&file_spec=b'
+             '&name=.'
+             '&package_name=chromium'
+             '&file_spec=e'
+             '&max_num_results=500'
+             '&xref_search_request=e')
+      url = url.format(signature=urllib.parse.quote(signature, safe=''))
+      result = self.retrieve(url);
+
+      if not result:
+        return {}
+
+      result = json.loads(result)['xref_search_response'][0]
+      status = result['status']
+      if not 'search_result' in result:
+          return {}
+      search_results = result['search_result']
+
+      xrefs = {}
+
+      for file_result in search_results:
+          filename = file_result['file']['name']
+          for match in file_result['match']:
+              if match['type'] == 'HAS_DEFINITION':
+                  xrefs['definition'] = self.getRefForMatch(filename, match);
+              elif match['type'] == 'HAS_DECLARATION':
+                  xrefs['declaration'] = self.getRefForMatch(filename, match);
+              elif match['type'] == 'OVERRIDDEN_BY':
+                  xrefs.setdefault('overrides', []);
+                  xrefs['overrides'].append(self.getRefForMatch(filename, match));
+              elif match['type'] == 'REFERENCED_AT':
+                  xrefs.setdefault('references', []);
+                  xrefs['references'].append(self.getRefForMatch(filename, match));
+      return xrefs
 
 # =============== !CODESEARCH CODE ===================
 
-
+g_cs = CodeSearch(True);
 
 g_last_xref_cmd = None  # The last chromium cmd that ran
-
-cacheResponses(True);
 
 def posixPath(path):
   if os.path.sep == '\\':
@@ -292,7 +283,6 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
 
   def updatePhantom(self, phantom):
-
     xref_data = self.data[self.view.window().id()];
     xref_data['phantom_set'].update([phantom])
 
@@ -302,6 +292,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     self.view.window().run_command("hide_panel", {"panel": "output.chromium_x_refs"})
 
   def processLink(self, link, callers):
+    global g_cs;
     link_type = link.split(':')[0]
 
     if link_type == 'selected_word':
@@ -354,7 +345,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     if (link_type == 'target'):
       goToLocation(self, self.src_path, caller);
     elif (link_type == 'expand'):
-      caller['callers'] = getCallGraphFor(caller['calling_signature'])
+      caller['callers'] = g_cs.getCallGraphFor(caller['calling_signature'])
       doc = self.genHtml()
       self.updatePhantom(self.createPhantom(doc));
 
@@ -494,6 +485,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     return body
 
   def getSignatureForSelection(self, edit):
+    global g_cs;
     self.selected_word = self.getWord();
     self.file_path = getRoot(self, self.view.file_name());
     if self.file_path == '':
@@ -504,7 +496,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
     self.selection_ref = {'line': self.selection_line, 'filename': self.file_path}
 
-    self.signature = getSignatureFor(self.file_path, self.selected_word);
+    self.signature = g_cs.getSignatureFor(self.file_path, self.selected_word);
     return self.signature != ''
 
   def log(self, msg):
@@ -521,18 +513,19 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
 
   def run(self, edit):
+    global g_cs;
     self.show_tests = True;
 
     if not self.getSignatureForSelection(edit):
       self.log("Could not find signature for: " + self.selected_word);
       return;
 
-    self.xrefs = getXrefsFor(self.signature);
+    self.xrefs = g_cs.getXrefsFor(self.signature);
     if not self.xrefs:
       self.log("Could not find xrefs for: " + self.selected_word);
       return;
 
-    self.callers = getCallGraphFor(self.signature);
+    self.callers = g_cs.getCallGraphFor(self.signature);
 
     doc = self.genHtml();
 
