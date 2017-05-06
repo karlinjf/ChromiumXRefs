@@ -12,7 +12,7 @@ import time
 import urllib.request
 import urllib.parse
 
-# === !CODESEARCH IMPROTS
+# === !CODESEARCH IMPORTS
 
 import html
 import html.parser
