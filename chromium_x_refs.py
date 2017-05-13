@@ -5,6 +5,7 @@
 # === CODESEARCH IMPORTS
 import datetime
 import json
+from socket import timeout
 import sys
 import tempfile
 import threading
@@ -86,14 +87,17 @@ class CodeSearch:
       else:
         response = urllib.request.urlopen(url, timeout=3)
 
-    except error:
+    except timeout:
       return ''
+    except (HTTPError, URLError) as error:
+      return ''
+
     result = response.read()
     if self.cache:
       self.cache.put(url, result);
     return result.decode('utf8');
 
-  def getSignatureFor(self, src_file, method):
+  def getSignatureFor(self, src_file, method, line):
       url = ('https://cs.chromium.org/codesearch/json'
              '?annotation_request=b'
              '&file_spec=b'
@@ -114,6 +118,41 @@ class CodeSearch:
 
       result = json.loads(result)['annotation_response'][0]
 
+      # First see if we can find the term on the given line
+      for snippet in result.get('annotation', []):
+        if not 'range' in snippet:
+          continue
+        range = snippet['range']
+        if not range['start_line'] == line:
+          continue
+
+        if 'internal_link' in snippet:
+          signature = snippet['internal_link']['signature']
+          if method in signature:
+            return signature
+        if 'xref_signature' in snippet:
+          signature = snippet['xref_signature']['signature']
+          if method in signature:
+            return signature
+
+      # Next see if we can find the term within 10 lines
+      for snippet in result.get('annotation', []):
+        if not 'range' in snippet:
+          continue
+        range = snippet['range']
+        if not abs(range['start_line'] - line) < 10:
+          continue
+
+        if 'internal_link' in snippet:
+          signature = snippet['internal_link']['signature']
+          if method in signature:
+            return signature
+        if 'xref_signature' in snippet:
+          signature = snippet['xref_signature']['signature']
+          if method in signature:
+            return signature
+
+      # Look for the term everywhere
       for snippet in result.get('annotation', []):
         if not 'type' in snippet:
           continue
@@ -427,7 +466,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body += "<div class=navbar>";
     xrefs = self.xrefs;
 
-    body += '<b> <a href=selected_word>' + self.selected_word + '</a>:</b>' + tab
+    body += '<b> <a href=selected_word>' + self.selected_word + '</a></b>' + tab
     if 'declaration' in xrefs:
       body += '<a href=declared:>Declaration</a>' + tab
     if 'definition' in xrefs:
@@ -496,7 +535,7 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
 
     self.selection_ref = {'line': self.selection_line, 'filename': self.file_path}
 
-    self.signature = g_cs.getSignatureFor(self.file_path, self.selected_word);
+    self.signature = g_cs.getSignatureFor(self.file_path, self.selected_word, self.selection_line);
     return self.signature != ''
 
   def log(self, msg):
