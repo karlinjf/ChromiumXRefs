@@ -6,5 +6,13 @@
 {
   "caption": "Chromium Recall X-Refs",
   "command": "chromium_recall_xrefs"
+},
+{
+  "caption": "Chromium Jump To Declaration",
+  "command": "chromium_xrefs_jump_to_declaration"
+},
+{
+  "caption": "Chromium Jump To Definition",
+  "command": "chromium_xrefs_jump_to_definition"
 }
 ]

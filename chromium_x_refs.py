@@ -23,6 +23,8 @@ import sys
 
 import sublime, sublime_plugin
 
+
+
 #sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 #import chromium_code_search as cs
 
@@ -284,91 +286,91 @@ def getRoot(cmd, path):
       return 'src' + path.split(rootPath)[1]
   return ''
 
-def goToLocation(cmd, src_path, caller):
+def goToLocation(cmd, src_path, caller, view):
   line = caller['line'];
   path = src_path + caller['filename']
-  cmd.view.window().open_file(path + ":%d:0" % line, sublime.ENCODED_POSITION)
+  view.window().open_file(path + ":%d:0" % line, sublime.ENCODED_POSITION)
 
-def goToSelection(cmd, src_path, callers, sel):
+def goToSelection(cmd, src_path, callers, sel, view):
   if sel < 0:
     return
-  goToLocation(cmd, src_path, callers[sel])
+  goToLocation(cmd, src_path, callers[sel], view)
 
-class ChromiumXrefsCommand(sublime_plugin.TextCommand):
-  def __init__(self, view):
-    self.view = view;
+class CXRefs:
+  def __init__(self):
     self.data = {}
+    print("Initializing")
 
-  def getWord(self):
-    for region in self.view.sel():
+  def getWord(self, view):
+    for region in view.sel():
       if region.empty():
           # if we have no selection grab the current word
-          word = self.view.word(region)
+          word = view.word(region)
 
           # grab the word plus two characters before it
           word_plus = sublime.Region(word.a, word.b)
           word_plus.a -= 1;
-          str_word_plus = self.view.substr(word_plus)
+          str_word_plus = view.substr(word_plus)
           if str_word_plus.startswith(":") or str_word_plus.startswith("~"):
             word = word_plus
 
           if not word.empty():
-              self.selection_line = self.view.rowcol(region.a)[0]+1;
-              return self.view.substr(word)
+              self.selection_line = view.rowcol(region.a)[0]+1;
+              return view.substr(word)
 
-  def createPhantom(self, doc):
-    xref_data = self.data[self.view.window().id()];
+  def createPhantom(self, doc, view):
+    xref_data = self.data[view.window().id()];
     loc = sublime.Region(0,0);
-    return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers));
+    return sublime.Phantom(loc, doc, sublime.LAYOUT_BELOW, lambda link: self.processLink(link, self.callers, view));
 
-  def updatePhantom(self, phantom):
-    xref_data = self.data[self.view.window().id()];
+  def updatePhantom(self, phantom, view):
+    xref_data = self.data[view.window().id()];
     xref_data['phantom_set'].update([phantom])
 
-  def destroyPhantom(self):
-    xref_data = self.data[self.view.window().id()];
+  def destroyPhantom(self, view):
+    xref_data = self.data[view.window().id()];
     xref_data['phantom_set'].update([])
-    self.view.window().run_command("hide_panel", {"panel": "output.chromium_x_refs"})
+    view.window().run_command("hide_panel", {"panel": "output.chromium_x_refs"})
 
-  def processLink(self, link, callers):
+  def processLink(self, link, callers, view):
     global g_cs;
     link_type = link.split(':')[0]
 
     if link_type == 'selected_word':
-      goToLocation(self, self.src_path, self.selection_ref);
+      goToLocation(self, self.src_path, self.selection_ref, view);
       return;
 
     if link_type == 'declared':
-      goToLocation(self, self.src_path, self.xrefs['declaration']);
+      goToLocation(self, self.src_path, self.xrefs['declaration'], view);
       return;
 
     if link_type == 'defined':
-      goToLocation(self, self.src_path, self.xrefs['definition']);
+      goToLocation(self, self.src_path, self.xrefs['definition'], view);
       return;
 
     if link_type == 'ref':
       ref = {}
       ref['line'] = int(link.split(':')[1])
       ref['filename'] = html.parser.HTMLParser().unescape(''.join(link.split(':')[2:]));
-      goToLocation(self, self.src_path, ref);
+      goToLocation(self, self.src_path, ref, view);
       return;
 
     if link_type == 'filter':
       if link.split(':')[1] == 'test':
         self.show_tests = False;
         doc = self.genHtml();
-        self.updatePhantom(self.createPhantom(doc));
+        self.updatePhantom(self.createPhantom(doc, view), view);
         return;
 
     if link_type == 'nofilter':
       if link.split(':')[1] == 'test':
         self.show_tests = True;
         doc = self.genHtml()
-        self.updatePhantom(self.createPhantom(doc));
+        self.updatePhantom(self.createPhantom(doc, view), view);
         return;
 
     if link_type == 'killPhantom':
-      self.destroyPhantom();
+      self.destroyPhantom(view);
       return;
 
     str_loc = link.split(':')[1]
@@ -377,26 +379,27 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     cur_callers = callers
     caller = None
     for i in loc:
+      print(cur_callers)
       caller = cur_callers[i]
       if 'callers' in caller:
         cur_callers = caller['callers']
 
     if (link_type == 'target'):
-      goToLocation(self, self.src_path, caller);
+      goToLocation(self, self.src_path, caller, view);
     elif (link_type == 'expand'):
       caller['callers'] = g_cs.getCallGraphFor(caller['calling_signature'])
       doc = self.genHtml()
-      self.updatePhantom(self.createPhantom(doc));
+      self.updatePhantom(self.createPhantom(doc, view), view);
 
     elif (link_type == 'shrink'):
       caller.pop('callers')
       doc = self.genHtml()
-      self.updatePhantom(self.createPhantom(doc));
+      self.updatePhantom(self.createPhantom(doc, view), view);
 
     elif (link_type == 'filter'):
       caller.pop('callers')
       doc = self.genHtml()
-      self.updatePhantom(self.createPhantom(doc));
+      self.updatePhantom(self.createPhantom(doc, view), view);
 
     # DO something
     link = 1
@@ -523,14 +526,14 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     body += "</body>"
     return body
 
-  def getSignatureForSelection(self, edit):
+  def getSignatureForSelection(self, edit, view):
     global g_cs;
-    self.selected_word = self.getWord();
-    self.file_path = getRoot(self, self.view.file_name());
+    self.selected_word = self.getWord(view);
+    self.file_path = getRoot(self, view.file_name());
     if self.file_path == '':
-      self.log("Could not find src/ directory in path");
+      self.log("Could not find src/ directory in path", view);
       return '';
-    self.src_path = posixPath(self.view.file_name().split(self.file_path)[0]);
+    self.src_path = posixPath(view.file_name().split(self.file_path)[0]);
     self.file_path = posixPath(self.file_path)
 
     self.selection_ref = {'line': self.selection_line, 'filename': self.file_path}
@@ -538,9 +541,9 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
     self.signature = g_cs.getSignatureFor(self.file_path, self.selected_word, self.selection_line);
     return self.signature != ''
 
-  def log(self, msg):
+  def log(self, msg, view):
       print(msg);
-      self.view.window().status_message(msg);
+      view.window().status_message(msg);
 
   def initWindow(self, window):
     if not window.id() in self.data:
@@ -550,46 +553,113 @@ class ChromiumXrefsCommand(sublime_plugin.TextCommand):
       xref_data['panel'] = window.create_output_panel("chromium_x_refs", False);
       xref_data['phantom_set'] = sublime.PhantomSet(xref_data['panel'], "phantoms");
 
-
-  def run(self, edit):
+  def displayXRefs(self, edit, view):
     global g_cs;
+
     self.show_tests = True;
 
-    if not self.getSignatureForSelection(edit):
-      self.log("Could not find signature for: " + self.selected_word);
+    if not self.getSignatureForSelection(edit, view):
+      self.log("Could not find signature for: " + self.selected_word, view);
       return;
 
     self.xrefs = g_cs.getXrefsFor(self.signature);
     if not self.xrefs:
-      self.log("Could not find xrefs for: " + self.selected_word);
+      self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
 
     self.callers = g_cs.getCallGraphFor(self.signature);
 
     doc = self.genHtml();
 
-    window = self.view.window();
+    window = view.window();
     self.initWindow(window);
 
-    global g_last_xref_cmd
-    g_last_xref_cmd = self;
-
-    self.updatePhantom(self.createPhantom(doc));
+    self.updatePhantom(self.createPhantom(doc, view), view);
     window.run_command("show_panel", {"panel": "output.chromium_x_refs"})
 
-
-  def recall(self):
-    window = self.view.window();
+  def recallXRefs(self, edit, view):
+    window = view.window();
     self.initWindow(window);
     doc = self.genHtml();
 
-    self.updatePhantom(self.createPhantom(doc));
-    window = self.view.window();
+    self.updatePhantom(self.createPhantom(doc, view), view);
+    window = view.window();
     window.run_command("show_panel", {"panel": "output.chromium_x_refs"})
 
-class ChromiumRecallXrefsCommand(sublime_plugin.TextCommand):
-  def run(self, edit):
-    global g_last_xref_cmd
-    if g_last_xref_cmd:
-      g_last_xref_cmd.recall();
+  def jumpToDeclaration(self, edit, view):
+    window = view.window();
 
+    if not self.getSignatureForSelection(edit, view):
+      self.log("Could not find signature for: " + self.selected_word, view);
+      return;
+
+    self.xrefs = g_cs.getXrefsFor(self.signature);
+    if not self.xrefs:
+      self.log("Could not find xrefs for: " + self.selected_word, view);
+      return;
+
+    if 'declaration' in self.xrefs:
+      goToLocation(self, self.src_path, self.xrefs['declaration'], view)
+    elif 'definition' in self.xrefs:
+      goToLocation(self, self.src_path, self.xrefs['definition'], view);
+    else:
+      self.log("Couldn't find a reference to jump to");
+      return;
+
+  def jumpToDefinition(self, edit, view):
+    window = view.window();
+
+    if not self.getSignatureForSelection(edit, view):
+      self.log("Could not find signature for: " + self.selected_word, view);
+      return;
+
+    self.xrefs = g_cs.getXrefsFor(self.signature);
+    if not self.xrefs:
+      self.log("Could not find xrefs for: " + self.selected_word, view);
+      return;
+
+    if 'definition' in self.xrefs:
+      goToLocation(self, self.src_path, self.xrefs['definition'], view);
+    elif 'declaration' in self.xrefs:
+      goToLocation(self, self.src_path, self.xrefs['declaration'], view)
+    else:
+      self.log("Couldn't find a reference to jump to");
+      return;
+
+g_cxrefs = CXRefs()
+
+class ChromiumXrefsCommand(sublime_plugin.TextCommand):
+  def __init__(self, view):
+    # Called once per view when you enter the view
+    self.view = view;
+
+  def run(self, edit):
+    global g_cxrefs;
+    g_cxrefs.displayXRefs(edit, self.view);
+
+class ChromiumRecallXrefsCommand(sublime_plugin.TextCommand):
+  def __init__(self, view):
+    # Called once per view when you enter the view
+    self.view = view;
+
+  def run(self, edit):
+    global g_cxrefs;
+    g_cxrefs.recallXRefs(edit, self.view);
+
+class ChromiumXrefsJumpToDeclarationCommand(sublime_plugin.TextCommand):
+  def __init__(self, view):
+    # Called once per view when you enter the view
+    self.view = view;
+
+  def run(self, edit):
+    global g_cxrefs;
+    g_cxrefs.jumpToDeclaration(edit, self.view)
+
+class ChromiumXrefsJumpToDefinitionCommand(sublime_plugin.TextCommand):
+  def __init__(self, view):
+    # Called once per view when you enter the view
+    self.view = view;
+
+  def run(self, edit):
+    global g_cxrefs;
+    g_cxrefs.jumpToDefinition(edit, self.view)
