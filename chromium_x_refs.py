@@ -589,19 +589,21 @@ class CXRefs:
   def jumpToDeclaration(self, edit, view):
     window = view.window();
 
+    # NOTE THAT THIS CALL OVERWRITES A BUNCH OF self VALUES WHICH MEANS THAT RECALL WILL BE BROKEN.
+    # TODO: CHANGE THIS FUNCTION TO NOT SET VALUES IN SELF
     if not self.getSignatureForSelection(edit, view):
       self.log("Could not find signature for: " + self.selected_word, view);
       return;
 
-    self.xrefs = g_cs.getXrefsFor(self.signature);
-    if not self.xrefs:
+    xrefs = g_cs.getXrefsFor(self.signature);
+    if not xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
 
-    if 'declaration' in self.xrefs:
-      goToLocation(self, self.src_path, self.xrefs['declaration'], view)
-    elif 'definition' in self.xrefs:
-      goToLocation(self, self.src_path, self.xrefs['definition'], view);
+    if 'declaration' in xrefs:
+      goToLocation(self, self.src_path, xrefs['declaration'], view)
+    elif 'definition' in xrefs:
+      goToLocation(self, self.src_path, xrefs['definition'], view);
     else:
       self.log("Couldn't find a reference to jump to");
       return;
@@ -613,15 +615,15 @@ class CXRefs:
       self.log("Could not find signature for: " + self.selected_word, view);
       return;
 
-    self.xrefs = g_cs.getXrefsFor(self.signature);
-    if not self.xrefs:
+    xrefs = g_cs.getXrefsFor(self.signature);
+    if not xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
 
-    if 'definition' in self.xrefs:
-      goToLocation(self, self.src_path, self.xrefs['definition'], view);
-    elif 'declaration' in self.xrefs:
-      goToLocation(self, self.src_path, self.xrefs['declaration'], view)
+    if 'definition' in xrefs:
+      goToLocation(self, self.src_path, xrefs['definition'], view);
+    elif 'declaration' in xrefs:
+      goToLocation(self, self.src_path, xrefs['declaration'], view)
     else:
       self.log("Couldn't find a reference to jump to");
       return;
