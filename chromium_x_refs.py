@@ -121,38 +121,62 @@ class CodeSearch:
       result = json.loads(result)['annotation_response'][0]
 
       # First see if we can find the term on the given line
+      closest = (1000000, '')
+
+
+      # Find the shortest matching snippet closest to the line that we're on.
+      # Shortest matching snippet because if a snippet without params matches
+      # then we don't want a snippet for a param.
       for snippet in result.get('annotation', []):
         if not 'range' in snippet:
           continue
+
         range = snippet['range']
-        if not range['start_line'] == line:
+        dist = abs(range['start_line'] - line);
+
+        if dist > closest[0]:
           continue
+
+        # TODO(jkarlin): Need to look for the closest match by column number
+        # as well as row. Otherwise, CacheStorageIndex::DoomCache winds up
+        # selecting between the method and its parameters and not know which
+        # is best because both signatures have DoomCache in them.
 
         if 'internal_link' in snippet:
           signature = snippet['internal_link']['signature']
+          if 'GENERATED' in snippet['internal_link']['path']:
+            continue
           if method in signature:
-            return signature
+            if dist < closest[0] or closest[1] == '' or len(closest[1]) > len(signature):
+              print("Found: " + json.dumps(snippet))
+              closest = (dist, signature)
         if 'xref_signature' in snippet:
           signature = snippet['xref_signature']['signature']
-          if method in signature:
-            return signature
 
-      # Next see if we can find the term within 10 lines
-      for snippet in result.get('annotation', []):
-        if not 'range' in snippet:
-          continue
-        range = snippet['range']
-        if not abs(range['start_line'] - line) < 10:
-          continue
+          if method in signature:
+           if dist < closest[0] or closest[1] == '' or len(closest[1]) > len(signature):
+              print("Found: " + json.dumps(snippet))
+              closest = (dist, signature)
 
-        if 'internal_link' in snippet:
-          signature = snippet['internal_link']['signature']
-          if method in signature:
-            return signature
-        if 'xref_signature' in snippet:
-          signature = snippet['xref_signature']['signature']
-          if method in signature:
-            return signature
+      if not closest[1] == '':
+        return closest[1]
+
+      # # Next see if we can find the term within 10 lines
+      # for snippet in result.get('annotation', []):
+      #   if not 'range' in snippet:
+      #     continue
+      #   range = snippet['range']
+      #   if not abs(range['start_line'] - line) < 10:
+      #     continue
+
+      #   if 'internal_link' in snippet:
+      #     signature = snippet['internal_link']['signature']
+      #     if method in signature:
+      #       return signature
+      #   if 'xref_signature' in snippet:
+      #     signature = snippet['xref_signature']['signature']
+      #     if method in signature:
+      #       return signature
 
       # Look for the term everywhere
       for snippet in result.get('annotation', []):
