@@ -370,6 +370,62 @@ class CXRefs:
     g_cs = getCS(self.src_path);
     results = []
 
+
+
+    # Add x-refs as callers too
+    node = codesearch.XrefNode.FromSignature(g_cs, signature);
+    references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
+    for reference in references:
+      # Get the annotations for the file, and find the closest function definition to
+      # the line that has the reference
+      csfile = reference.GetFile()
+      line = reference.single_match.line_number
+      snippet = reference.single_match.line_text
+
+
+      print("Finding closest to: %d" % line)
+      annotations = csfile.GetAnnotations()
+      closest_line = -1
+      closest_node = None
+      for annotation in annotations:
+        if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
+          continue
+        if not hasattr(annotation, 'xref_signature'):
+          continue
+        if '\\.h' in annotation.xref_signature.signature:
+          # We want methods defined in this file, that make the xref
+          continue
+        annotation_line = annotation.range.start_line
+        if annotation_line > closest_line and annotation_line < line:
+          closest_line = annotation_line
+          closest_node = annotation
+
+      if closest_line > -1:
+        print("Closest line = %d" % closest_line)
+        # This is the closest method to the line that the xref is on
+        sig = closest_node.xref_signature.signature
+        method_name = sig.split("(")[0]
+        method_name = method_name.split("::")[-1]
+        method_name = method_name.split(" ")[-1]
+        call = {
+          'filename': csfile.Path(),
+          'line': line,
+          'col': 0,
+          'text': snippet,
+          'calling_method': method_name,
+          'calling_signature': sig,
+          'display_name': method_name
+        }
+        results.append(call)
+
+
+    # return { 'filename': node.GetFile().Path(),
+    #          'signature': node.GetSignature(),
+    #          'line': node.single_match.line_number,
+    #          'line_text': node.single_match.line_text }
+
+
+
     response = g_cs.SendRequestToServer(
       codesearch.CompoundRequest(call_graph_request=[codesearch.CallGraphRequest(
         file_spec=g_cs.GetFileSpec(),
