@@ -23,266 +23,18 @@ import sys
 
 import sublime, sublime_plugin
 
+import ChromiumXRefs.third_party.codesearch.codesearch as codesearch
 
+g_cs = None
 
-#sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-#import chromium_code_search as cs
-
-# Use the below once the respository is renamed:
-#from ChromiumXRefs.lib import chromium_code_search as cs
-
-# TODO store the phantom's location so that update calls can use the same location
-# TODO support multiple phantoms (probably need to store some phantom id in the links for lookup)
-
-
-# =============== CODESEARCH CODE ===================
-
-# A key/value store that stores objects to disk in temporary objects
-# for 30 minutes.
-class FileCache:
-  def __init__(self):
-    self.store = {}
-    threading.Timer(15 * 60, self.gc).start();
-
-  def put(self, url, data):
-    f = tempfile.TemporaryFile();
-    f.write(data);
-    self.store[url] = (f, datetime.datetime.now());
-
-  def get(self, url):
-    if not url in self.store:
-      return ''
-    (f, timestamp) = self.store[url]
-    f.seek(0);
-    return f.read();
-
-  def gc(self):
-    threading.Timer(15 * 60, self.gc).start();
-    expired = datetime.datetime.now() - datetime.timedelta(minutes=30);
-    remove = []
-    for url, (f, timestamp) in self.store.items():
-      if timestamp < expired:
-        remove.append(url)
-    for url in remove:
-      self.store.pop(url);
-
-class CodeSearch:
-  def __init__(self, should_cache):
-    self.cache = None
-    if should_cache:
-      self.cache = FileCache();
-
-  # Retrieve the url by first trying to cache and falling back to the network.
-  def retrieve(self, url):
-    if self.cache:
-      cached_response = self.cache.get(url);
-      if (cached_response):
-        return cached_response.decode('utf8');
-
-    response = None
-
-    try:
-      if len(url) > 1500:
-        short_url = url.split('?')[0]
-        data = url.split('?')[1]
-        response = urllib.request.urlopen(short_url, data=data.encode('utf-8'), timeout=3)
-      else:
-        response = urllib.request.urlopen(url, timeout=3)
-
-    except timeout:
-      return ''
-    except (HTTPError, URLError) as error:
-      return ''
-
-    result = response.read()
-    if self.cache:
-      self.cache.put(url, result);
-    return result.decode('utf8');
-
-  def getSignatureFor(self, src_file, method, line):
-      url = ('https://cs.chromium.org/codesearch/json'
-             '?annotation_request=b'
-             '&file_spec=b'
-             '&package_name=chromium'
-             '&name={file_name}'
-             '&file_spec=e'
-             '&type=b'
-             '&id=1'
-             '&type=e'
-             '&label='
-             '&follow_branches=false'
-             '&annotation_request=e')
-      url = url.format(file_name=urllib.parse.quote(src_file, safe=''))
-
-      result = self.retrieve(url);
-      if not result:
-        return ''
-
-      result = json.loads(result)['annotation_response'][0]
-
-      # First see if we can find the term on the given line
-      closest = (1000000, '')
-
-
-      # Find the shortest matching snippet closest to the line that we're on.
-      # Shortest matching snippet because if a snippet without params matches
-      # then we don't want a snippet for a param.
-      for snippet in result.get('annotation', []):
-        if not 'range' in snippet:
-          continue
-
-        range = snippet['range']
-        dist = abs(range['start_line'] - line);
-
-        if dist > closest[0]:
-          continue
-
-        # TODO(jkarlin): Need to look for the closest match by column number
-        # as well as row. Otherwise, CacheStorageIndex::DoomCache winds up
-        # selecting between the method and its parameters and not know which
-        # is best because both signatures have DoomCache in them.
-
-        if 'internal_link' in snippet:
-          signature = snippet['internal_link']['signature']
-          if 'GENERATED' in snippet['internal_link']['path']:
-            continue
-          if method in signature:
-            if dist < closest[0] or closest[1] == '' or len(closest[1]) > len(signature):
-              print("Found: " + json.dumps(snippet))
-              closest = (dist, signature)
-        if 'xref_signature' in snippet:
-          signature = snippet['xref_signature']['signature']
-
-          if method in signature:
-           if dist < closest[0] or closest[1] == '' or len(closest[1]) > len(signature):
-              print("Found: " + json.dumps(snippet))
-              closest = (dist, signature)
-
-      if not closest[1] == '':
-        return closest[1]
-
-      # # Next see if we can find the term within 10 lines
-      # for snippet in result.get('annotation', []):
-      #   if not 'range' in snippet:
-      #     continue
-      #   range = snippet['range']
-      #   if not abs(range['start_line'] - line) < 10:
-      #     continue
-
-      #   if 'internal_link' in snippet:
-      #     signature = snippet['internal_link']['signature']
-      #     if method in signature:
-      #       return signature
-      #   if 'xref_signature' in snippet:
-      #     signature = snippet['xref_signature']['signature']
-      #     if method in signature:
-      #       return signature
-
-      # Look for the term everywhere
-      for snippet in result.get('annotation', []):
-        if not 'type' in snippet:
-          continue
-        if 'xref_signature' in snippet:
-          signature = snippet['xref_signature']['signature']
-          if '%s(' % method in signature:
-            return signature
-
-        elif 'internal_link' in snippet:
-          signature = snippet['internal_link']['signature']
-          if '::%s' % method in signature or 'class-%s' % method in signature:
-            return signature
-      return ''
-
-  def getCallGraphFor(self, signature):
-      url = ('https://cs.chromium.org/codesearch/json'
-           '?call_graph_request=b'
-           '&signature={signature}'
-           '&file_spec=b'
-           '&package_name=chromium'
-           '&name=.'
-           '&file_spec=e'
-           '&max_num_results=500'
-           '&call_graph_request=e')
-      url = url.format(signature=urllib.parse.quote(signature, safe=''))
-
-      result = self.retrieve(url);
-      if not result:
-        return {}
-
-      result = json.loads(result)['call_graph_response'][0];
-      node = result['node'];
-
-      callers = [];
-      last_signature = ''
-      if not 'children' in node:
-        return callers
-      for child in node['children']:
-        if child['signature'] == last_signature:
-          continue
-        if not 'snippet_file_path' in child:
-          continue
-
-        caller = {}
-        caller['filename'] = child['snippet_file_path'];
-        caller['line'] = child['call_site_range']['start_line']
-        caller['col'] = child['call_site_range']['start_column']
-        caller['text'] = child['snippet']['text']['text']
-        caller['calling_method'] = child['identifier']
-        caller['calling_signature'] = child['signature']
-        last_signature = child['signature']
-        caller['display_name'] = child['display_name']
-        callers.append(caller)
-      return callers
-
-  def getRefForMatch(self, filename, match):
-    ref = {'filename': filename, 'line': match['line_number'], 'signature': match['signature']}
-    if 'line_text' in match:
-      ref['line_text'] = match['line_text']
-    return ref;
-
-
-  def getXrefsFor(self, signature):
-      url = ('https://cs.chromium.org/codesearch/json'
-             '?xref_search_request=b'
-             '&query={signature}'
-             '&file_spec=b'
-             '&name=.'
-             '&package_name=chromium'
-             '&file_spec=e'
-             '&max_num_results=500'
-             '&xref_search_request=e')
-      url = url.format(signature=urllib.parse.quote(signature, safe=''))
-      result = self.retrieve(url);
-
-      if not result:
-        return {}
-
-      result = json.loads(result)['xref_search_response'][0]
-      status = result['status']
-      if not 'search_result' in result:
-          return {}
-      search_results = result['search_result']
-
-      xrefs = {}
-
-      for file_result in search_results:
-          filename = file_result['file']['name']
-          for match in file_result['match']:
-              if match['type'] == 'HAS_DEFINITION':
-                  xrefs['definition'] = self.getRefForMatch(filename, match);
-              elif match['type'] == 'HAS_DECLARATION':
-                  xrefs['declaration'] = self.getRefForMatch(filename, match);
-              elif match['type'] == 'OVERRIDDEN_BY':
-                  xrefs.setdefault('overrides', []);
-                  xrefs['overrides'].append(self.getRefForMatch(filename, match));
-              elif match['type'] == 'REFERENCED_AT':
-                  xrefs.setdefault('references', []);
-                  xrefs['references'].append(self.getRefForMatch(filename, match));
-      return xrefs
-
-# =============== !CODESEARCH CODE ===================
-
-g_cs = CodeSearch(True);
+def getCS(path=None):
+  global g_cs
+  if g_cs is None:
+    if path is None:
+      print("No g_cs found and unable to create one.")
+      return None
+    g_cs = codesearch.CodeSearch(should_cache=True, source_root=path)
+  return g_cs
 
 g_last_xref_cmd = None  # The last chromium cmd that ran
 
@@ -340,6 +92,7 @@ class CXRefs:
 
           if not word.empty():
               self.selection_line = view.rowcol(region.a)[0]+1;
+              self.selection_column = view.rowcol(region.a)[1];
               return view.substr(word)
 
   def createPhantom(self, doc, view):
@@ -357,7 +110,7 @@ class CXRefs:
     view.window().run_command("hide_panel", {"panel": "output.chromium_x_refs"})
 
   def processLink(self, link, callers, view):
-    global g_cs;
+    g_cs = getCS();
     link_type = link.split(':')[0]
 
     if link_type == 'selected_word':
@@ -403,7 +156,6 @@ class CXRefs:
     cur_callers = callers
     caller = None
     for i in loc:
-      print(cur_callers)
       caller = cur_callers[i]
       if 'callers' in caller:
         cur_callers = caller['callers']
@@ -411,7 +163,7 @@ class CXRefs:
     if (link_type == 'target'):
       goToLocation(self, self.src_path, caller, view);
     elif (link_type == 'expand'):
-      caller['callers'] = g_cs.getCallGraphFor(caller['calling_signature'])
+      caller['callers'] = self.getCallGraphFor(caller['calling_signature'])
       doc = self.genHtml()
       self.updatePhantom(self.createPhantom(doc, view), view);
 
@@ -551,19 +303,108 @@ class CXRefs:
     return body
 
   def getSignatureForSelection(self, edit, view):
-    global g_cs;
     self.selected_word = self.getWord(view);
-    self.file_path = getRoot(self, view.file_name());
-    if self.file_path == '':
+    root_path = getRoot(self, view.file_name());
+    if root_path == '':
       self.log("Could not find src/ directory in path", view);
       return '';
-    self.src_path = posixPath(view.file_name().split(self.file_path)[0]);
-    self.file_path = posixPath(self.file_path)
+    self.src_path = posixPath(view.file_name().split(root_path)[0]);
 
-    self.selection_ref = {'line': self.selection_line, 'filename': self.file_path}
+    self.selection_ref = {'line': self.selection_line, 'filename': root_path }
 
-    self.signature = g_cs.getSignatureFor(self.file_path, self.selected_word, self.selection_line);
+    # This is tricky, figure out
+    file_path = posixPath(view.file_name())
+
+    g_cs = getCS(self.src_path);
+
+    # First see if we have an exact match at this location (e.g., unedited file)
+    try:
+      sig = g_cs.GetSignatureForLocation(file_path, self.selection_line, self.selection_column);
+      if self.selected_word in sig:
+        self.signature = sig
+        print("Found signature: %s" % (sig))
+        return True
+    except Exception as e:
+      x = 1  # do nothing
+
+    # Otherwise grab the first thing that comes
+    signatures = g_cs.GetSignaturesForSymbol(file_path, self.selected_word);
+    if len(signatures) > 0:
+      print("Found signature: %s" % (signatures[0]))
+      self.signature = signatures[0]
     return self.signature != ''
+
+  def getRefForXrefNode(self, node):
+    return { 'filename': node.GetFile().Path(),
+             'signature': node.GetSignature(),
+             'line': node.single_match.line_number,
+             'line_text': node.single_match.line_text }
+
+  def getXrefsFor(self, signature):
+    g_cs = getCS(self.src_path);
+
+    results = {}
+
+    node = codesearch.XrefNode.FromSignature(g_cs, signature);
+    definitions = node.GetEdges(codesearch.EdgeEnumKind.HAS_DEFINITION)
+    if definitions:
+      results['definition'] = self.getRefForXrefNode(definitions[0])
+
+    declarations = node.GetEdges(codesearch.EdgeEnumKind.HAS_DECLARATION)
+    if declarations:
+      results['declaration'] = self.getRefForXrefNode(declarations[0])
+
+    overrides = node.GetEdges(codesearch.EdgeEnumKind.OVERRIDDEN_BY)
+    results['overrides'] = []
+    for override in overrides:
+      results['overrides'].append(self.getRefForXrefNode(override))
+
+    references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
+    results['references'] = []
+    for reference in references:
+      results['references'].append(self.getRefForXrefNode(reference))
+
+    return results
+
+  def getCallGraphFor(self, signature):
+    g_cs = getCS(self.src_path);
+    results = []
+
+    response = g_cs.SendRequestToServer(
+      codesearch.CompoundRequest(call_graph_request=[codesearch.CallGraphRequest(
+        file_spec=g_cs.GetFileSpec(),
+        max_num_results=500,
+        signature=signature)
+      ]))
+
+    last_signature = ''
+    if not response.call_graph_response:
+      return results
+
+    node = response.call_graph_response[0].node
+    if not hasattr(node, 'children'):
+      return results
+
+    for caller in node.children:
+      if caller.signature == last_signature:
+        continue
+      if not caller.snippet_file_path:
+        continue
+
+      last_signature = caller.signature
+
+      call = { 'filename': caller.file_path,
+               'line': caller.call_site_range.start_line,
+               'col': caller.call_site_range.start_column,
+               'text': caller.snippet.text.text,
+               'calling_method': caller.identifier,
+               'calling_signature': caller.signature,
+               'display_name': caller.display_name
+             }
+      results.append(call)
+
+    return results
+
 
   def log(self, msg, view):
       print(msg);
@@ -578,7 +419,6 @@ class CXRefs:
       xref_data['phantom_set'] = sublime.PhantomSet(xref_data['panel'], "phantoms");
 
   def displayXRefs(self, edit, view):
-    global g_cs;
 
     self.show_tests = True;
 
@@ -586,12 +426,14 @@ class CXRefs:
       self.log("Could not find signature for: " + self.selected_word, view);
       return;
 
-    self.xrefs = g_cs.getXrefsFor(self.signature);
+    g_cs = getCS();
+
+    self.xrefs = self.getXrefsFor(self.signature);
     if not self.xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
 
-    self.callers = g_cs.getCallGraphFor(self.signature);
+    self.callers = self.getCallGraphFor(self.signature);
 
     doc = self.genHtml();
 
@@ -619,7 +461,8 @@ class CXRefs:
       self.log("Could not find signature for: " + self.selected_word, view);
       return;
 
-    xrefs = g_cs.getXrefsFor(self.signature);
+    g_cs = getCS();
+    xrefs = self.getXrefsFor(self.signature);
     if not xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
@@ -639,7 +482,8 @@ class CXRefs:
       self.log("Could not find signature for: " + self.selected_word, view);
       return;
 
-    xrefs = g_cs.getXrefsFor(self.signature);
+    g_cs = getCS();
+    xrefs = self.getXrefsFor(self.signature);
     if not xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
