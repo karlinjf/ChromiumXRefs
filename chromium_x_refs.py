@@ -2,19 +2,6 @@
 # Use of this source code is governed by the Apache license found in the LICENSE
 # file.
 
-# === CODESEARCH IMPORTS
-import datetime
-import json
-from socket import timeout
-import sys
-import tempfile
-import threading
-import time
-import urllib.request
-import urllib.parse
-
-# === !CODESEARCH IMPORTS
-
 import html
 import html.parser
 import imp
@@ -23,7 +10,7 @@ import sys
 
 import sublime, sublime_plugin
 
-import ChromiumXRefs.third_party.codesearch.codesearch as codesearch
+import ChromiumXRefs.third_party.codesearch as codesearch
 
 g_cs = None
 
