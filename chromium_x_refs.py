@@ -152,6 +152,7 @@ class CXRefs:
 
     str_loc = link.split(':')[1]
     loc = [int(x) for x in str_loc.split(',')]
+
     cur_callers = callers
     caller = None
     for i in loc:
@@ -199,7 +200,7 @@ class CXRefs:
       if self.show_tests or not 'test' in calling_method.lower():
         body += "<li>%s %s</li>" % (link_expander, link_target)
         if 'callers' in caller:
-          body += self.genHtmlImpl(caller['callers'], location + [loc])
+          body += self.genHtmlImpl(caller['callers'], [loc] + location)
       loc += 1
 
     body += "</ul>"
@@ -379,6 +380,8 @@ class CXRefs:
       line = reference.single_match.line_number
       snippet = reference.single_match.line_text
 
+
+      print("Finding closest to: %d" % line)
       annotations = csfile.GetAnnotations()
       closest_line = -1
       closest_node = None
@@ -396,8 +399,10 @@ class CXRefs:
           closest_node = annotation
 
       if closest_line > -1:
+        print("Closest line = %d" % closest_line)
         # This is the closest method to the line that the xref is on
         closest_sig = closest_node.xref_signature.signature
+        print("Closest sig: %s" % closest_sig)
 
         method_name = closest_sig.split("(")[0]
         method_name = method_name.replace("class-", "")
