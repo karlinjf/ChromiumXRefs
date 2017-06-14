@@ -370,8 +370,6 @@ class CXRefs:
     g_cs = getCS(self.src_path);
     results = []
 
-
-
     # Add x-refs as callers too
     node = codesearch.XrefNode.FromSignature(g_cs, signature);
     references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
@@ -403,28 +401,22 @@ class CXRefs:
       if closest_line > -1:
         print("Closest line = %d" % closest_line)
         # This is the closest method to the line that the xref is on
-        sig = closest_node.xref_signature.signature
-        method_name = sig.split("(")[0]
-        method_name = method_name.split("::")[-1]
-        method_name = method_name.split(" ")[-1]
+        closest_sig = closest_node.xref_signature.signature
+        print("Closest sig: %s" % closest_sig)
+
+        method_name = closest_sig.split("(")[0]
+        method_name = method_name.replace("class-", "")
+        method_name = method_name.replace("cpp:", "")
+        method_name = "async: " + method_name
         call = {
           'filename': csfile.Path(),
           'line': line,
           'col': 0,
           'text': snippet,
-          'calling_method': method_name,
-          'calling_signature': sig,
+          'calling_signature': closest_sig,
           'display_name': method_name
         }
         results.append(call)
-
-
-    # return { 'filename': node.GetFile().Path(),
-    #          'signature': node.GetSignature(),
-    #          'line': node.single_match.line_number,
-    #          'line_text': node.single_match.line_text }
-
-
 
     response = g_cs.SendRequestToServer(
       codesearch.CompoundRequest(call_graph_request=[codesearch.CallGraphRequest(
