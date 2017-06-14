@@ -448,7 +448,7 @@ class CXRefs:
       if self.show_tests or not 'test' in calling_method.lower():
         body += "<li>%s %s</li>" % (link_expander, link_target)
         if 'callers' in caller:
-          body += self.genHtmlImpl(caller['callers'], [loc] + location)
+          body += self.genHtmlImpl(caller['callers'], location + [loc])
       loc += 1
 
     body += "</ul>"
