@@ -402,7 +402,7 @@ class CXRefs:
         method_name = closest_sig.split("(")[0]
         method_name = method_name.replace("class-", "")
         method_name = method_name.replace("cpp:", "")
-        method_name = "ref: " + method_name
+        method_name = "async: " + method_name
         call = {
           'filename': csfile.Path(),
           'line': line,
