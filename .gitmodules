@@ -1,3 +1,0 @@
-[submodule "third_party/codesearch"]
-	path = third_party/codesearch
-	url = https://github.com/chromium/codesearch-py.git
