@@ -301,7 +301,7 @@ class CXRefs:
     # This is tricky, figure out
     file_path = posixPath(view.file_name())
 
-    g_cs = getCS(self.src_path);
+    g_cs = getCS(os.path.abspath(self.src_path));
 
     # First see if we have an exact match at this location (e.g., unedited file)
     try:
