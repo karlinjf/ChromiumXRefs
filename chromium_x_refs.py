@@ -327,7 +327,7 @@ class CXRefs:
              'line_text': node.single_match.line_text }
 
   def getXrefsFor(self, signature):
-    g_cs = getCS(self.src_path);
+    g_cs = getCS(os.path.abspath(self.src_path));
 
     results = {}
 
@@ -353,7 +353,7 @@ class CXRefs:
     return results
 
   def getCallGraphFor(self, signature):
-    g_cs = getCS(self.src_path);
+    g_cs = getCS(os.path.abspath(self.src_path));
     results = []
 
     # Add x-refs as callers too
