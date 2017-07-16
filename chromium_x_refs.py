@@ -2,6 +2,7 @@
 # Use of this source code is governed by the Apache license found in the LICENSE
 # file.
 
+import datetime
 import html
 import html.parser
 import imp
@@ -13,14 +14,27 @@ import sublime, sublime_plugin
 import ChromiumXRefs.third_party.codesearch as codesearch
 
 g_cs = None
+g_last_gcd_g_cs = datetime.datetime.now()
 
 def getCS(path=None):
   global g_cs
+  global g_last_gcd_g_cs
+
+  create = False
+
   if g_cs is None:
     if path is None:
       print("No g_cs found and unable to create one.")
       return None
+    create = True
+  if not path is None and (datetime.datetime.now() - g_last_gcd_g_cs).seconds > 60 * 30:
+    # The codesearch object collects cruft over time. The easiest way to deal with that is to periodically delete it.
+    create = True
+
+  if create:
     g_cs = codesearch.CodeSearch(should_cache=True, source_root=path)
+    g_last_gcd_g_cs = datetime.datetime.now()
+
   return g_cs
 
 g_last_xref_cmd = None  # The last chromium cmd that ran
@@ -62,7 +76,6 @@ def goToSelection(cmd, src_path, callers, sel, view):
 class CXRefs:
   def __init__(self):
     self.data = {}
-    print("Initializing")
 
   def getWord(self, view):
     for region in view.sel():
@@ -71,11 +84,11 @@ class CXRefs:
           word = view.word(region)
 
           # grab the word plus two characters before it
-          word_plus = sublime.Region(word.a, word.b)
-          word_plus.a -= 1;
-          str_word_plus = view.substr(word_plus)
-          if str_word_plus.startswith(":") or str_word_plus.startswith("~"):
-            word = word_plus
+          # word_plus = sublime.Region(word.a, word.b)
+          # word_plus.a -= 1;
+          # str_word_plus = view.substr(word_plus)
+          # if str_word_plus.startswith(":") or str_word_plus.startswith("~"):
+          #   word = word_plus
 
           if not word.empty():
               self.selection_line = view.rowcol(region.a)[0]+1;
@@ -289,6 +302,7 @@ class CXRefs:
     return body
 
   def getSignatureForSelection(self, edit, view):
+    self.signature = ''
     self.selected_word = self.getWord(view);
     root_path = getRoot(self, view.file_name());
     if root_path == '':
@@ -308,20 +322,20 @@ class CXRefs:
       sig = g_cs.GetSignatureForLocation(file_path, self.selection_line, self.selection_column);
       if self.selected_word in sig:
         self.signature = sig
-        print("Found signature: %s" % (sig))
         return True
     except Exception as e:
+      #print ("Error: %s" % e.strerror)
       x = 1  # do nothing
 
     # Otherwise grab the first thing that comes
     signatures = g_cs.GetSignaturesForSymbol(file_path, self.selected_word);
     if len(signatures) > 0:
-      print("Found signature: %s" % (signatures[0]))
       self.signature = signatures[0]
+
     return self.signature != ''
 
   def getRefForXrefNode(self, node):
-    return { 'filename': node.GetFile().Path(),
+    return { 'filename': node.filespec.name,
              'signature': node.GetSignature(),
              'line': node.single_match.line_number,
              'line_text': node.single_match.line_text }
@@ -329,76 +343,82 @@ class CXRefs:
   def getXrefsFor(self, signature):
     g_cs = getCS(os.path.abspath(self.src_path));
 
-    results = {}
+    results = {'overrides':[], 'references':[]}
 
     node = codesearch.XrefNode.FromSignature(g_cs, signature);
-    definitions = node.GetEdges(codesearch.EdgeEnumKind.HAS_DEFINITION)
-    if definitions:
-      results['definition'] = self.getRefForXrefNode(definitions[0])
+    refs = node.GetEdges([codesearch.EdgeEnumKind.HAS_DEFINITION,
+                          codesearch.EdgeEnumKind.HAS_DECLARATION,
+                          codesearch.EdgeEnumKind.OVERRIDDEN_BY,
+                          codesearch.EdgeEnumKind.REFERENCED_AT],
+                          max_num_results="100");
+    if not refs:
+      return results
 
-    declarations = node.GetEdges(codesearch.EdgeEnumKind.HAS_DECLARATION)
-    if declarations:
-      results['declaration'] = self.getRefForXrefNode(declarations[0])
+    xref_nodes = []
+    for n in refs:
+      xref = self.getRefForXrefNode(n)
+      if n.single_match.type == 'HAS_DEFINITION':
+        results['definition'] = xref
+      elif n.single_match.type == 'HAS_DECLARATION':
+        results['declaration'] = xref
+      elif n.single_match.type == 'OVERRIDDEN_BY':
+        results['overrides'].append(xref)
+      elif n.single_match.type == 'REFERENCED_AT':
+        results['references'].append(xref)
+        xref_nodes.append(n)
 
-    overrides = node.GetEdges(codesearch.EdgeEnumKind.OVERRIDDEN_BY)
-    results['overrides'] = []
-    for override in overrides:
-      results['overrides'].append(self.getRefForXrefNode(override))
+    return (results, xref_nodes)
 
-    references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
-    results['references'] = []
-    for reference in references:
-      results['references'].append(self.getRefForXrefNode(reference))
-
-    return results
-
-  def getCallGraphFor(self, signature):
+  def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(os.path.abspath(self.src_path));
     results = []
 
     # Add x-refs as callers too
     node = codesearch.XrefNode.FromSignature(g_cs, signature);
-    references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
-    for reference in references:
-      # Get the annotations for the file, and find the closest function definition to
-      # the line that has the reference
-      csfile = reference.GetFile()
-      line = reference.single_match.line_number
-      snippet = reference.single_match.line_text
+    if references is None:
+      references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
 
-      annotations = csfile.GetAnnotations()
-      closest_line = -1
-      closest_node = None
-      for annotation in annotations:
-        if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
-          continue
-        if not hasattr(annotation, 'xref_signature'):
-          continue
-        if '\\.h' in annotation.xref_signature.signature:
-          # We want methods defined in this file, that make the xref
-          continue
-        annotation_line = annotation.range.start_line
-        if annotation_line > closest_line and annotation_line < line:
-          closest_line = annotation_line
-          closest_node = annotation
+    if len(references) < 10:
+      for reference in references:
+        # Get the annotations for the file, and find the closest function definition to
+        # the line that has the reference
+        csfile = reference.GetFile()
+        line = reference.single_match.line_number
+        snippet = reference.single_match.line_text
 
-      if closest_line > -1:
-        # This is the closest method to the line that the xref is on
-        closest_sig = closest_node.xref_signature.signature
+        annotations = csfile.GetAnnotations()
+        closest_line = -1
+        closest_node = None
+        for annotation in annotations:
+          if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
+            continue
+          if not hasattr(annotation, 'xref_signature'):
+            continue
+          if '\\.h' in annotation.xref_signature.signature:
+            # We want methods defined in this file, that make the xref
+            continue
+          annotation_line = annotation.range.start_line
+          if annotation_line > closest_line and annotation_line < line:
+            closest_line = annotation_line
+            closest_node = annotation
 
-        method_name = closest_sig.split("(")[0]
-        method_name = method_name.replace("class-", "")
-        method_name = method_name.replace("cpp:", "")
-        method_name = "ref: " + method_name
-        call = {
-          'filename': csfile.Path(),
-          'line': line,
-          'col': 0,
-          'text': snippet,
-          'calling_signature': closest_sig,
-          'display_name': method_name
-        }
-        results.append(call)
+        if closest_line > -1:
+          # This is the closest method to the line that the xref is on
+          closest_sig = closest_node.xref_signature.signature
+
+          method_name = closest_sig.split("(")[0]
+          method_name = method_name.replace("class-", "")
+          method_name = method_name.replace("cpp:", "")
+          method_name = "ref: " + method_name
+          call = {
+            'filename': csfile.Path(),
+            'line': line,
+            'col': 0,
+            'text': snippet,
+            'calling_signature': closest_sig,
+            'display_name': method_name
+          }
+          results.append(call)
 
     response = g_cs.SendRequestToServer(
       codesearch.CompoundRequest(call_graph_request=[codesearch.CallGraphRequest(
@@ -458,12 +478,12 @@ class CXRefs:
 
     g_cs = getCS();
 
-    self.xrefs = self.getXrefsFor(self.signature);
+    (self.xrefs, xref_nodes) = self.getXrefsFor(self.signature);
     if not self.xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
 
-    self.callers = self.getCallGraphFor(self.signature);
+    self.callers = self.getCallGraphFor(self.signature, xref_nodes);
 
     doc = self.genHtml();
 

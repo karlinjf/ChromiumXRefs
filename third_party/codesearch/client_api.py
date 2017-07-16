@@ -626,9 +626,11 @@ class CodeSearch(object):
         continue
 
       if hasattr(annotation, 'xref_signature'):
+        print("Found sig: %s" % annotation.xref_signature.signature)
         return annotation.xref_signature.signature
 
       if hasattr(annotation, 'internal_link'):
+        print("Found sig: %s" % annotation.internal_link.signature)
         return annotation.internal_link.signature
 
     raise Exception("Can't determine signature for %s at %d:%d" %
@@ -843,7 +845,7 @@ class CodeSearch(object):
     |filename| specifies a file on disk (or just relative to the
     |source_root|).  |buffer_lines| is a list of strings containing the
     expected contents of the file.
-    
+
     If |check_prefix| is true, then only the first len(buffer_lines) lines of
     |filename| are compared.
     """
