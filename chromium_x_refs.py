@@ -463,6 +463,8 @@ class CXRefs:
         for annotation in annotations:
           if not annotation.xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
             continue
+          if not hasattr(annotation, 'internal_link'):
+            continue
           if not 'STATE' in annotation.internal_link.signature:
             continue
           # if not hasattr(annotation, 'xref_signature'):
@@ -516,18 +518,16 @@ class CXRefs:
             }
 
             results.append(call)
-
-
-
-      call = { 'filename': caller.file_path,
-               'line': caller.call_site_range.start_line,
-               'col': caller.call_site_range.start_column,
-               'text': caller.snippet.text.text,
-               'calling_method': caller.identifier,
-               'calling_signature': caller.signature,
-               'display_name': caller.display_name
-             }
-      results.append(call)
+      else:
+        call = { 'filename': caller.file_path,
+                 'line': caller.call_site_range.start_line,
+                 'col': caller.call_site_range.start_column,
+                 'text': caller.snippet.text.text,
+                 'calling_method': caller.identifier,
+                 'calling_signature': caller.signature,
+                 'display_name': caller.display_name
+               }
+        results.append(call)
 
     return results
 
