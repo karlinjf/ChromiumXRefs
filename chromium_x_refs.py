@@ -409,20 +409,20 @@ class CXRefs:
 
     if len(references) < 10:
       for reference in references:
-        method = self.getEnclosingMethod(reference)
-        if not method is None:
+        method_node = self.getEnclosingMethod(reference)
+        if not method_node is None:
           # This is the closest method to the line that the xref is on
-          closest_sig = closest_node.xref_signature.signature
+          closest_sig = method_node.xref_signature.signature
 
           method_name = closest_sig.split("(")[0]
           method_name = method_name.replace("class-", "")
           method_name = method_name.replace("cpp:", "")
           method_name = "ref: " + method_name
           call = {
-            'filename': csfile.Path(),
-            'line': line,
+            'filename': reference.GetFile().Path(),
+            'line': reference.single_match.line_number,
             'col': 0,
-            'text': snippet,
+            'text': reference.single_match.line_text,
             'calling_signature': closest_sig,
             'display_name': method_name
           }
