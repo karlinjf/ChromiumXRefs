@@ -369,6 +369,35 @@ class CXRefs:
 
     return (results, xref_nodes)
 
+  def getEnclosingMethod(self, edge):
+    g_cs = getCS();
+
+    # Get the annotations for the file, and find the closest function definition to
+    # the line that has the reference
+    csfile = edge.GetFile()
+    line = edge.single_match.line_number
+    snippet = edge.single_match.line_text
+
+    annotations = csfile.GetAnnotations()
+    closest_line = -1
+    closest_node = None
+    for annotation in annotations:
+      if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
+        continue
+      if not hasattr(annotation, 'xref_signature'):
+        continue
+      if '\\.h' in annotation.xref_signature.signature:
+        # We want methods defined in this file, that make the xref
+        continue
+      annotation_line = annotation.range.start_line
+      if annotation_line > closest_line and annotation_line < line:
+        closest_line = annotation_line
+        closest_node = annotation
+
+    return closest_node
+
+
+
   def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(os.path.abspath(self.src_path));
     results = []
@@ -380,29 +409,8 @@ class CXRefs:
 
     if len(references) < 10:
       for reference in references:
-        # Get the annotations for the file, and find the closest function definition to
-        # the line that has the reference
-        csfile = reference.GetFile()
-        line = reference.single_match.line_number
-        snippet = reference.single_match.line_text
-
-        annotations = csfile.GetAnnotations()
-        closest_line = -1
-        closest_node = None
-        for annotation in annotations:
-          if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
-            continue
-          if not hasattr(annotation, 'xref_signature'):
-            continue
-          if '\\.h' in annotation.xref_signature.signature:
-            # We want methods defined in this file, that make the xref
-            continue
-          annotation_line = annotation.range.start_line
-          if annotation_line > closest_line and annotation_line < line:
-            closest_line = annotation_line
-            closest_node = annotation
-
-        if closest_line > -1:
+        method = self.getEnclosingMethod(reference)
+        if not method is None:
           # This is the closest method to the line that the xref is on
           closest_sig = closest_node.xref_signature.signature
 
@@ -418,6 +426,7 @@ class CXRefs:
             'calling_signature': closest_sig,
             'display_name': method_name
           }
+
           results.append(call)
 
     response = g_cs.SendRequestToServer(
@@ -442,6 +451,73 @@ class CXRefs:
         continue
 
       last_signature = caller.signature
+
+      if 'DoLoop' in caller.identifier:
+        print("%s is identifier, path = %s" %(caller.identifier, self.src_path+caller.file_path))
+        csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
+        line = caller.call_site_range.start_line
+
+        annotations = csfile.GetAnnotations()
+        closest_line = -1
+        closest_enum = None
+        for annotation in annotations:
+          if not annotation.xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
+            continue
+          if not 'STATE' in annotation.internal_link.signature:
+            continue
+          # if not hasattr(annotation, 'xref_signature'):
+          #   continue
+
+          #if '\\.h' in annotation.xref_signature.signature:
+          #  # We want methods defined in this file, that make the xref
+          #  continue
+          annotation_line = annotation.range.start_line
+          if annotation_line > closest_line and annotation_line < line:
+            closest_line = annotation_line
+            closest_enum = annotation
+
+        if closest_line > -1:
+          # This is the closest enum constant to the doloop caller, assume
+          # that this is the state enum that gets us here. Now figure out
+          # where the state is set, that's our caller.
+          print("Closest enum: %s" % closest_enum.internal_link.signature);
+          node = codesearch.XrefNode.FromSignature(g_cs, closest_enum.internal_link.signature);
+          refs = node.GetEdges([codesearch.EdgeEnumKind.REFERENCED_AT],
+                          max_num_results="100");
+
+          for ref in refs:
+            if not ref.single_match.node_type == 'USAGE':
+              continue
+            if 'case' in ref.single_match.line_text:
+              continue
+            if '==' in ref.single_match.line_text:
+              continue
+            #print(ref)
+
+
+            method = self.getEnclosingMethod(ref)
+            if method is None:
+              continue
+
+            method_name = method.xref_signature.signature.split("(")[0]
+            method_name = method_name.replace("class-", "")
+            method_name = method_name.replace("cpp:", "")
+            method_name = "doloop: " + method_name
+            print("FOund method: %s" % method)
+
+            call = {
+              'filename': ref.filespec.name,
+              'line': ref.single_match.line_number,
+              'col': 0,
+              'calling_signature': method.xref_signature.signature,
+              'text': ref.single_match.line_text,
+              'display_name': method_name,
+              'calling_method': method_name
+            }
+
+            results.append(call)
+
+
 
       call = { 'filename': caller.file_path,
                'line': caller.call_site_range.start_line,
