@@ -27,7 +27,7 @@ def getCS(path=None):
       print("No g_cs found and unable to create one.")
       return None
     create = True
-  if not path is None and (datetime.datetime.now() - g_last_gcd_g_cs).seconds > 60 * 30:
+  if not path is None and (datetime.datetime.now() - g_last_gcd_g_cs).seconds > 60 * 10:
     # The codesearch object collects cruft over time. The easiest way to deal with that is to periodically delete it.
     create = True
 
@@ -324,11 +324,39 @@ class CXRefs:
         self.signature = sig
         return True
     except Exception as e:
-      #print ("Error: %s" % e.strerror)
       x = 1  # do nothing
 
     # Otherwise grab the first thing that comes
-    signatures = g_cs.GetSignaturesForSymbol(file_path, self.selected_word);
+    signatures = []
+    file_info = g_cs.GetFileInfo(file_path)
+    xref_kind = None
+    for annotation in file_info.GetAnnotations():
+      if not hasattr(annotation, 'xref_kind') or not hasattr(
+          annotation, 'xref_signature'):
+        continue
+
+      if xref_kind is not None and xref_kind != annotation.xref_kind:
+        continue
+
+      if annotation.xref_signature.signature in signatures:
+        continue
+
+      if self.selected_word in annotation.xref_signature.signature:
+        print("Match range: %s" % (annotation.range))
+        print("Matched text: %s" % file_info.Text(annotation.range))
+        signatures.append(annotation.xref_signature.signature)
+    # Find the closest signature to the line we're on
+
+
+
+      # text = file_info.Text(annotation.range)
+      # if not matcher.Match(text):
+      #   continue
+
+
+
+
+    # signatures = g_cs.GetSignaturesForSymbol(file_path, self.selected_word);
     if len(signatures) > 0:
       self.signature = signatures[0]
 
