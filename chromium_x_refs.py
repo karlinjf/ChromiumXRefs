@@ -343,7 +343,8 @@ class CXRefs:
         annotation_line = annotation.range.start_line
         if abs(annotation_line - self.selection_line) < closest_line:
           signature = annotation.xref_signature.signature
-          closest_line = annotation_line
+          closest_line = abs(annotation_line - self.selection_line)
+
     self.signature = signature
 
     return self.signature != ''
