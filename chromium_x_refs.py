@@ -125,6 +125,10 @@ class CXRefs:
       goToLocation(self, self.src_path, self.xrefs['definition'], view);
       return;
 
+    if link_type == 'overrides':
+      goToLocation(self, self.src_path, self.xrefs['overrides'], view);
+      return;
+
     if link_type == 'ref':
       ref = {}
       ref['line'] = int(link.split(':')[1])
@@ -248,7 +252,10 @@ class CXRefs:
     if 'declaration' in xrefs:
       body += '<a href=declared:>Declaration</a>' + tab
     if 'definition' in xrefs:
-      body += '<a href=defined:>Definition</a>'
+      body += '<a href=defined:>Definition</a>' + tab
+    if 'overrides' in xrefs:
+      body += '<a href=overrides:>Overrides</a>'
+
 
     body += tab;
 
@@ -287,11 +294,11 @@ class CXRefs:
         body += '</ul>'
       body += '</ul></p>'
 
-    if 'overrides' in xrefs:
-      body += '<p><b>Overrides:</b><br><ul>'
+    if 'overridden' in xrefs:
+      body += '<p><b>Overridden by:</b><br><ul>'
 
       last_file = ''
-      for ref in xrefs['overrides']:
+      for ref in xrefs['overridden']:
         if ref['filename'] != last_file:
             if last_file != '':
               body += '</ul>';
@@ -363,11 +370,12 @@ class CXRefs:
   def getXrefsFor(self, signature):
     g_cs = getCS(os.path.abspath(self.src_path));
 
-    results = {'overrides':[], 'references':[]}
+    results = {'overridden':[], 'references':[]}
 
     node = codesearch.XrefNode.FromSignature(g_cs, signature);
     refs = node.GetEdges([codesearch.EdgeEnumKind.HAS_DEFINITION,
                           codesearch.EdgeEnumKind.HAS_DECLARATION,
+                          codesearch.EdgeEnumKind.OVERRIDES,
                           codesearch.EdgeEnumKind.OVERRIDDEN_BY,
                           codesearch.EdgeEnumKind.REFERENCED_AT],
                           max_num_results="100");
@@ -381,8 +389,10 @@ class CXRefs:
         results['definition'] = xref
       elif n.single_match.type == 'HAS_DECLARATION':
         results['declaration'] = xref
+      elif n.single_match.type == 'OVERRIDES':
+        results['overrides'] = xref
       elif n.single_match.type == 'OVERRIDDEN_BY':
-        results['overrides'].append(xref)
+        results['overridden'].append(xref)
       elif n.single_match.type == 'REFERENCED_AT':
         results['references'].append(xref)
         xref_nodes.append(n)
