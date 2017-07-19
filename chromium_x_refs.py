@@ -283,7 +283,9 @@ class CXRefs:
             body += '<li>' + ref['filename'] + '</li><ul>';
             last_file = ref['filename'];
         body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['line_text']));
-      body += '</ul></ul></p>'
+      if last_file:
+        body += '</ul>'
+      body += '</ul></p>'
 
     if 'overrides' in xrefs:
       body += '<p><b>Overrides:</b><br><ul>'
@@ -296,10 +298,13 @@ class CXRefs:
             body += '<li>' + ref['filename'] + '</li><ul>';
             last_file = ref['filename'];
         body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['line_text']));
-      body += '</ul></ul></p>'
+      if last_file:
+        body += '</ul>'
+      body += '</ul></p>'
 
     body += "</body>"
     return body
+
 
   def getSignatureForSelection(self, edit, view):
     self.signature = ''
@@ -468,7 +473,6 @@ class CXRefs:
       last_signature = caller.signature
 
       if 'DoLoop' in caller.identifier:
-        print("%s is identifier, path = %s" %(caller.identifier, self.src_path+caller.file_path))
         csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
         line = caller.call_site_range.start_line
 
@@ -497,7 +501,6 @@ class CXRefs:
           # This is the closest enum constant to the doloop caller, assume
           # that this is the state enum that gets us here. Now figure out
           # where the state is set, that's our caller.
-          print("Closest enum: %s" % closest_enum.internal_link.signature);
           node = codesearch.XrefNode.FromSignature(g_cs, closest_enum.internal_link.signature);
           refs = node.GetEdges([codesearch.EdgeEnumKind.REFERENCED_AT],
                           max_num_results="100");
@@ -520,7 +523,6 @@ class CXRefs:
             method_name = method_name.replace("class-", "")
             method_name = method_name.replace("cpp:", "")
             method_name = "doloop: " + method_name
-            print("FOund method: %s" % method)
 
             call = {
               'filename': ref.filespec.name,
@@ -575,7 +577,6 @@ class CXRefs:
       return;
 
     self.callers = self.getCallGraphFor(self.signature, xref_nodes);
-
     doc = self.genHtml();
 
     window = view.window();
