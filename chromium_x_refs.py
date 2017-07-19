@@ -327,9 +327,10 @@ class CXRefs:
       x = 1  # do nothing
 
     # Otherwise grab the first thing that comes
-    signatures = []
+    signature = ''
     file_info = g_cs.GetFileInfo(file_path)
     xref_kind = None
+    closest_line = 99999999
     for annotation in file_info.GetAnnotations():
       if not hasattr(annotation, 'xref_kind') or not hasattr(
           annotation, 'xref_signature'):
@@ -338,27 +339,12 @@ class CXRefs:
       if xref_kind is not None and xref_kind != annotation.xref_kind:
         continue
 
-      if annotation.xref_signature.signature in signatures:
-        continue
-
       if self.selected_word in annotation.xref_signature.signature:
-        print("Match range: %s" % (annotation.range))
-        print("Matched text: %s" % file_info.Text(annotation.range))
-        signatures.append(annotation.xref_signature.signature)
-    # Find the closest signature to the line we're on
-
-
-
-      # text = file_info.Text(annotation.range)
-      # if not matcher.Match(text):
-      #   continue
-
-
-
-
-    # signatures = g_cs.GetSignaturesForSymbol(file_path, self.selected_word);
-    if len(signatures) > 0:
-      self.signature = signatures[0]
+        annotation_line = annotation.range.start_line
+        if abs(annotation_line - self.selection_line) < closest_line:
+          signature = annotation.xref_signature.signature
+          closest_line = annotation_line
+    self.signature = signature
 
     return self.signature != ''
 
