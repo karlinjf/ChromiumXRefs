@@ -328,32 +328,34 @@ class CXRefs:
 
     g_cs = getCS(self.src_path);
 
-    # First see if we have an exact match at this location (e.g., unedited file)
-    try:
-      sig = g_cs.GetSignatureForLocation(abs_file, self.selection_line, self.selection_column);
-      if self.selected_word in sig:
-        self.signature = sig
-        return True
-    except Exception as e:
-      x = 1  # do nothing
+    # # First see if we have an exact match at this location (e.g., unedited file)
+    # try:
+    #   sig = g_cs.GetSignatureForLocation(abs_file, self.selection_line, self.selection_column);
+    #   if self.selected_word in sig:
+    #     self.signature = sig
+    #     return True
+    # except Exception as e:
+    #   x = 1  # do nothing
 
-    # Otherwise grab the first thing that comes
+    # Grab the nearest signature. A signature exactly in the right line and column wins.
     signature = ''
     file_info = g_cs.GetFileInfo(abs_file)
-    xref_kind = None
     closest_line = 99999999
     for annotation in file_info.GetAnnotations():
-      if not hasattr(annotation, 'xref_kind') or not hasattr(
-          annotation, 'xref_signature'):
+      sig = ''
+      if hasattr(annotation, 'xref_signature'):
+        sig = annotation.xref_signature.signature
+
+      if hasattr(annotation, 'internal_link'):
+        sig = annotation.internal_link.signature
+
+      if not sig:
         continue
 
-      if xref_kind is not None and xref_kind != annotation.xref_kind:
-        continue
-
-      if self.selected_word in annotation.xref_signature.signature:
+      if self.selected_word in sig:
         annotation_line = annotation.range.start_line
-        if abs(annotation_line - self.selection_line) < closest_line:
-          signature = annotation.xref_signature.signature
+        if abs(annotation_line - self.selection_line) < closest_line or annotation.range.Contains(self.selection_line, self.selection_column):
+          signature = sig
           closest_line = abs(annotation_line - self.selection_line)
 
     self.signature = signature
@@ -403,7 +405,11 @@ class CXRefs:
 
     # Get the annotations for the file, and find the closest function definition to
     # the line that has the reference
-    csfile = edge.GetFile()
+    try:
+      csfile = edge.GetFile()
+    except Exception as e:
+      return None
+
     line = edge.single_match.line_number
     snippet = edge.single_match.line_text
 
