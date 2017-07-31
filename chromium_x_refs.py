@@ -316,22 +316,21 @@ class CXRefs:
   def getSignatureForSelection(self, edit, view):
     self.signature = ''
     self.selected_word = self.getWord(view);
-    root_path = getRoot(self, view.file_name());
+    abs_file = posixPath(os.path.abspath(os.path.realpath(view.file_name())))
+
+    root_path = getRoot(self, abs_file);
     if root_path == '':
       self.log("Could not find src/ directory in path", view);
       return '';
-    self.src_path = posixPath(view.file_name().split(root_path)[0]);
+    self.src_path = abs_file.split(root_path)[0]
 
     self.selection_ref = {'line': self.selection_line, 'filename': root_path }
 
-    # This is tricky, figure out
-    file_path = posixPath(view.file_name())
-
-    g_cs = getCS(os.path.abspath(self.src_path));
+    g_cs = getCS(self.src_path);
 
     # First see if we have an exact match at this location (e.g., unedited file)
     try:
-      sig = g_cs.GetSignatureForLocation(file_path, self.selection_line, self.selection_column);
+      sig = g_cs.GetSignatureForLocation(abs_file, self.selection_line, self.selection_column);
       if self.selected_word in sig:
         self.signature = sig
         return True
@@ -340,7 +339,7 @@ class CXRefs:
 
     # Otherwise grab the first thing that comes
     signature = ''
-    file_info = g_cs.GetFileInfo(file_path)
+    file_info = g_cs.GetFileInfo(abs_file)
     xref_kind = None
     closest_line = 99999999
     for annotation in file_info.GetAnnotations():
@@ -368,7 +367,7 @@ class CXRefs:
              'line_text': node.single_match.line_text }
 
   def getXrefsFor(self, signature):
-    g_cs = getCS(os.path.abspath(self.src_path));
+    g_cs = getCS(self.src_path);
 
     results = {'overridden':[], 'references':[]}
 
@@ -429,7 +428,7 @@ class CXRefs:
 
 
   def getCallGraphFor(self, signature, references=None):
-    g_cs = getCS(os.path.abspath(self.src_path));
+    g_cs = getCS(self.src_path);
     results = []
 
     # Add x-refs as callers too
