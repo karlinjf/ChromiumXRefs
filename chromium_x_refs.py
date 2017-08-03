@@ -619,7 +619,7 @@ class CXRefs:
       return;
 
     g_cs = getCS();
-    xrefs = self.getXrefsFor(self.signature);
+    (xrefs, refs) = self.getXrefsFor(self.signature);
     if not xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
@@ -629,7 +629,7 @@ class CXRefs:
     elif 'definition' in xrefs:
       goToLocation(self, self.src_path, xrefs['definition'], view);
     else:
-      self.log("Couldn't find a reference to jump to");
+      self.log("Couldn't find a reference to jump to", view);
       return;
 
   def jumpToDefinition(self, edit, view):
@@ -640,7 +640,7 @@ class CXRefs:
       return;
 
     g_cs = getCS();
-    xrefs = self.getXrefsFor(self.signature);
+    (xrefs, refs) = self.getXrefsFor(self.signature);
     if not xrefs:
       self.log("Could not find xrefs for: " + self.selected_word, view);
       return;
@@ -650,7 +650,7 @@ class CXRefs:
     elif 'declaration' in xrefs:
       goToLocation(self, self.src_path, xrefs['declaration'], view)
     else:
-      self.log("Couldn't find a reference to jump to");
+      self.log("Couldn't find a reference to jump to", view);
       return;
 
 g_cxrefs = CXRefs()
