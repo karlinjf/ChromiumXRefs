@@ -352,14 +352,13 @@ class CXRefs:
       if not sig:
         continue
 
-      if self.selected_word in sig:
+      if self.selected_word in sig and self.selected_word in file_info.Text(annotation.range):
         annotation_line = annotation.range.start_line
         if abs(annotation_line - self.selection_line) < closest_line or annotation.range.Contains(self.selection_line, self.selection_column):
           signature = sig
           closest_line = abs(annotation_line - self.selection_line)
 
     self.signature = signature
-
     return self.signature != ''
 
   def getRefForXrefNode(self, node):
