@@ -7,7 +7,9 @@ import html
 import html.parser
 import imp
 import os.path
+import re
 import sys
+import time
 
 import sublime, sublime_plugin
 
@@ -15,6 +17,8 @@ import ChromiumXRefs.third_party.codesearch as codesearch
 
 g_cs = None
 g_last_gcd_g_cs = datetime.datetime.now()
+
+
 
 def getCS(path=None):
   global g_cs
@@ -63,10 +67,60 @@ def getRoot(cmd, path):
       return 'src' + path.split(rootPath)[1]
   return ''
 
+g_open_callbacks_on_load = {}
+
+class EventListener(sublime_plugin.EventListener):
+    # Called when a file is finished loading.
+    def on_load_async(self, view):
+        global g_open_callbacks_on_load
+        if view.file_name() in g_open_callbacks_on_load:
+            g_open_callbacks_on_load[view.file_name()]()
+            del g_open_callbacks_on_load[view.file_name()]
+
+
 def goToLocation(cmd, src_path, caller, view):
   line = caller['line'];
   path = src_path + caller['filename']
-  view.window().open_file(path + ":%d:0" % line, sublime.ENCODED_POSITION)
+
+  # Open the file and jump to the line
+  new_view = view.window().open_file(path + ":%d:0" % line, sublime.ENCODED_POSITION)
+  if new_view.is_loading():
+    global g_open_callbacks_on_load
+    g_open_callbacks_on_load[path] = lambda: finishGoingToLocation(caller, new_view)
+    return
+
+  finishGoingToLocation(caller, new_view)
+
+def finishGoingToLocation(caller, view):
+  # Highlight the text
+  position = view.sel()[0].a
+  line = view.substr(view.line(position))
+  view.sel().clear()
+  view.sel().add(view.line(position))
+
+  if (caller['text'] in line):
+    return
+
+  # Find where the line might be
+  regions = view.find_all(caller['text'], sublime.LITERAL)
+
+  if not regions:
+    return
+
+  # Find the closest region to our current position
+  closest_region = None
+
+  for region in regions:
+    if closest_region is None:
+      closest_region = region
+      continue
+
+    if abs(region.a - closest_region.a) < abs(closest_region.a - position):
+      closest_region = region
+
+  view.show_at_center(closest_region)
+  view.sel().clear()
+  view.sel().add(closest_region)
 
 def goToSelection(cmd, src_path, callers, sel, view):
   if sel < 0:
@@ -289,7 +343,7 @@ class CXRefs:
               body += '</ul>';
             body += '<li>' + ref['filename'] + '</li><ul>';
             last_file = ref['filename'];
-        body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['line_text']));
+        body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['text']));
       if last_file:
         body += '</ul>'
       body += '</ul></p>'
@@ -304,7 +358,7 @@ class CXRefs:
               body += '</ul>';
             body += '<li>' + ref['filename'] + '</li><ul>';
             last_file = ref['filename'];
-        body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['line_text']));
+        body += "<li><a href=ref:%d:%s>%s</a></li>" % (ref['line'], html.escape(ref['filename']), html.escape(ref['text']));
       if last_file:
         body += '</ul>'
       body += '</ul></p>'
@@ -365,7 +419,7 @@ class CXRefs:
     return { 'filename': node.filespec.name,
              'signature': node.GetSignature(),
              'line': node.single_match.line_number,
-             'line_text': node.single_match.line_text }
+             'text': node.single_match.line_text }
 
   def getXrefsFor(self, signature):
     g_cs = getCS(self.src_path);
