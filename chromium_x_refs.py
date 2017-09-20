@@ -484,6 +484,72 @@ class CXRefs:
 
     return closest_node
 
+  def GetIPCCaller(self, caller, results):
+    print("hi")
+
+  def GetDoLoopCaller(self, caller, results):
+      csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
+      line = caller.call_site_range.start_line
+
+      annotations = csfile.GetAnnotations()
+      closest_line = -1
+      closest_enum = None
+      for annotation in annotations:
+        if not annotation.xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
+          continue
+        if not hasattr(annotation, 'internal_link'):
+          continue
+        if not 'STATE' in annotation.internal_link.signature:
+          continue
+        # if not hasattr(annotation, 'xref_signature'):
+        #   continue
+
+        #if '\\.h' in annotation.xref_signature.signature:
+        #  # We want methods defined in this file, that make the xref
+        #  continue
+        annotation_line = annotation.range.start_line
+        if annotation_line > closest_line and annotation_line < line:
+          closest_line = annotation_line
+          closest_enum = annotation
+
+      if closest_line > -1:
+        # This is the closest enum constant to the doloop caller, assume
+        # that this is the state enum that gets us here. Now figure out
+        # where the state is set, that's our caller.
+        node = codesearch.XrefNode.FromSignature(g_cs, closest_enum.internal_link.signature);
+        refs = node.GetEdges([codesearch.EdgeEnumKind.REFERENCED_AT],
+                        max_num_results="100");
+
+        for ref in refs:
+          if not ref.single_match.node_type == 'USAGE':
+            continue
+          if 'case' in ref.single_match.line_text:
+            continue
+          if '==' in ref.single_match.line_text:
+            continue
+          #print(ref)
+
+
+          method = self.getEnclosingMethod(ref)
+          if method is None:
+            continue
+
+          method_name = method.xref_signature.signature.split("(")[0]
+          method_name = method_name.replace("class-", "")
+          method_name = method_name.replace("cpp:", "")
+          method_name = "doloop: " + method_name
+
+          call = {
+            'filename': ref.filespec.name,
+            'line': ref.single_match.line_number,
+            'col': 0,
+            'calling_signature': method.xref_signature.signature,
+            'text': ref.single_match.line_text,
+            'display_name': method_name,
+            'calling_method': method_name
+          }
+
+          results.append(call)
 
 
   def getCallGraphFor(self, signature, references=None):
@@ -541,68 +607,10 @@ class CXRefs:
       last_signature = caller.signature
 
       if 'DoLoop' in caller.identifier:
-        csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
-        line = caller.call_site_range.start_line
+        self.GetDoLoopCaller(caller, results)
+      elif 'OnMessageReceived' in caller.identifier:
+        self.GetIPCCaller(caller, results)
 
-        annotations = csfile.GetAnnotations()
-        closest_line = -1
-        closest_enum = None
-        for annotation in annotations:
-          if not annotation.xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
-            continue
-          if not hasattr(annotation, 'internal_link'):
-            continue
-          if not 'STATE' in annotation.internal_link.signature:
-            continue
-          # if not hasattr(annotation, 'xref_signature'):
-          #   continue
-
-          #if '\\.h' in annotation.xref_signature.signature:
-          #  # We want methods defined in this file, that make the xref
-          #  continue
-          annotation_line = annotation.range.start_line
-          if annotation_line > closest_line and annotation_line < line:
-            closest_line = annotation_line
-            closest_enum = annotation
-
-        if closest_line > -1:
-          # This is the closest enum constant to the doloop caller, assume
-          # that this is the state enum that gets us here. Now figure out
-          # where the state is set, that's our caller.
-          node = codesearch.XrefNode.FromSignature(g_cs, closest_enum.internal_link.signature);
-          refs = node.GetEdges([codesearch.EdgeEnumKind.REFERENCED_AT],
-                          max_num_results="100");
-
-          for ref in refs:
-            if not ref.single_match.node_type == 'USAGE':
-              continue
-            if 'case' in ref.single_match.line_text:
-              continue
-            if '==' in ref.single_match.line_text:
-              continue
-            #print(ref)
-
-
-            method = self.getEnclosingMethod(ref)
-            if method is None:
-              continue
-
-            method_name = method.xref_signature.signature.split("(")[0]
-            method_name = method_name.replace("class-", "")
-            method_name = method_name.replace("cpp:", "")
-            method_name = "doloop: " + method_name
-
-            call = {
-              'filename': ref.filespec.name,
-              'line': ref.single_match.line_number,
-              'col': 0,
-              'calling_signature': method.xref_signature.signature,
-              'text': ref.single_match.line_text,
-              'display_name': method_name,
-              'calling_method': method_name
-            }
-
-            results.append(call)
       else:
         call = { 'filename': caller.file_path,
                  'line': caller.call_site_range.start_line,
