@@ -484,8 +484,7 @@ class CXRefs:
 
     return closest_node
 
-  def GetIPCCaller(self, caller, results):
-    print("hi")
+
 
   def GetDoLoopCaller(self, caller, results):
       csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
@@ -494,6 +493,7 @@ class CXRefs:
       annotations = csfile.GetAnnotations()
       closest_line = -1
       closest_enum = None
+      found = False
       for annotation in annotations:
         if not annotation.xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
           continue
@@ -527,8 +527,6 @@ class CXRefs:
             continue
           if '==' in ref.single_match.line_text:
             continue
-          #print(ref)
-
 
           method = self.getEnclosingMethod(ref)
           if method is None:
@@ -550,7 +548,73 @@ class CXRefs:
           }
 
           results.append(call)
+          found = True
 
+      return found
+
+  def GetIPCCaller(self, call, reference, results):
+    g_cs = getCS(self.src_path);
+    line = reference.single_match.line_number
+    line_text = reference.single_match.line_text
+    # line text: IPC_MESSAGE_HANDLER(CacheStorageHostMsg_CacheStorageKeys, OnCacheStorageKeys)
+
+    # Get the signature for the message
+    csfile = reference.GetFile()
+    # Replace GetAnnotationsForFile code with csfile.GetAnnotations() once LINK_TO_DEFINITION is in the library
+    response = g_cs.GetAnnotationsForFile(csfile.GetFileSpec(),
+      [codesearch.AnnotationType(id=codesearch.AnnotationTypeValue.LINK_TO_DEFINITION)])
+    if not hasattr(response.annotation_response[0], 'annotation'):
+      return False
+    annotations = response.annotation_response[0].annotation
+
+    closest_line = -1
+    message_ref = None
+    for annotation in annotations:
+      if not annotation.xref_kind == codesearch.NodeEnumKind.TYPE_ALIAS:
+        continue
+      if not hasattr(annotation, 'internal_link'):
+        continue
+
+      annotation_line = annotation.range.start_line
+      if annotation_line > closest_line and annotation_line <= line:
+        closest_line = annotation_line
+        message_ref = annotation
+
+    if closest_line == -1:
+      return False
+
+    found = False
+
+    # Get xrefs for the signature
+    node = codesearch.XrefNode.FromSignature(g_cs, message_ref.internal_link.signature)
+    refs = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
+    for ref in refs:
+      if not ref.single_match.node_type == 'USAGE':
+        continue
+      if not 'new' in ref.single_match.line_text:
+        continue
+      method = self.getEnclosingMethod(ref)
+      if method is None:
+        continue
+
+      method_name = method.xref_signature.signature.split("(")[0]
+      method_name = method_name.replace("class-", "")
+      method_name = method_name.replace("cpp:", "")
+      method_name = "ipc: " + method_name
+
+      call = {
+        'filename': ref.filespec.name,
+        'line': ref.single_match.line_number,
+        'col': 0,
+        'calling_signature': method.xref_signature.signature,
+        'text': ref.single_match.line_text,
+        'display_name': method_name,
+        'calling_method': method_name
+      }
+      results.append(call)
+      found = True
+
+    return found
 
   def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(self.src_path);
@@ -563,6 +627,7 @@ class CXRefs:
 
     if len(references) < 10:
       for reference in references:
+
         method_node = self.getEnclosingMethod(reference)
         if not method_node is None:
           # This is the closest method to the line that the xref is on
@@ -581,7 +646,12 @@ class CXRefs:
             'display_name': method_name
           }
 
-          results.append(call)
+          handled = False
+          if 'OnMessageReceived' in method_name:
+            handled = self.GetIPCCaller(call, reference, results)
+          if not handled:
+            results.append(call)
+
 
     response = g_cs.SendRequestToServer(
       codesearch.CompoundRequest(call_graph_request=[codesearch.CallGraphRequest(
@@ -606,12 +676,10 @@ class CXRefs:
 
       last_signature = caller.signature
 
+      handled = False
       if 'DoLoop' in caller.identifier:
-        self.GetDoLoopCaller(caller, results)
-      elif 'OnMessageReceived' in caller.identifier:
-        self.GetIPCCaller(caller, results)
-
-      else:
+        handled = self.GetDoLoopCaller(caller, results)
+      if not handled:
         call = { 'filename': caller.file_path,
                  'line': caller.call_site_range.start_line,
                  'col': caller.call_site_range.start_column,
