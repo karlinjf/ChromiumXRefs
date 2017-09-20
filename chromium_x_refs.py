@@ -137,12 +137,13 @@ class CXRefs:
           # if we have no selection grab the current word
           word = view.word(region)
 
-          # grab the word plus two characters before it
-          # word_plus = sublime.Region(word.a, word.b)
-          # word_plus.a -= 1;
-          # str_word_plus = view.substr(word_plus)
-          # if str_word_plus.startswith(":") or str_word_plus.startswith("~"):
-          #   word = word_plus
+          if view.substr(sublime.Region(word.a-2, word.b)).startswith("::"):
+            word = sublime.Region(word.a-2, word.b)
+          elif view.substr(sublime.Region(word.a-1, word.b)).startswith("~"):
+            word = sublime.Region(word.a-1, word.b)
+
+          if view.substr(sublime.Region(word.a, word.b+1)).endswith("("):
+            word = sublime.Region(word.a, word.b+1)
 
           if not word.empty():
               self.selection_line = view.rowcol(region.a)[0]+1;
@@ -370,6 +371,9 @@ class CXRefs:
   def getSignatureForSelection(self, edit, view):
     self.signature = ''
     self.selected_word = self.getWord(view);
+    clean_word = self.selected_word.replace(':', '')
+    clean_word = clean_word.replace('~', '')
+    clean_word = clean_word.replace('(', '')
     abs_file = posixPath(os.path.abspath(os.path.realpath(view.file_name())))
 
     root_path = getRoot(self, abs_file);
@@ -406,7 +410,8 @@ class CXRefs:
       if not sig:
         continue
 
-      if self.selected_word in sig and self.selected_word in file_info.Text(annotation.range):
+
+      if self.selected_word in sig and clean_word in file_info.Text(annotation.range):
         annotation_line = annotation.range.start_line
         if abs(annotation_line - self.selection_line) < closest_line or annotation.range.Contains(self.selection_line, self.selection_column):
           signature = sig
