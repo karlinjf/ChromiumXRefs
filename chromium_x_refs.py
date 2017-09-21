@@ -130,6 +130,7 @@ def goToSelection(cmd, src_path, callers, sel, view):
 class CXRefs:
   def __init__(self):
     self.data = {}
+    self.in_mojo = False
 
   def getWord(self, view):
     for region in view.sel():
@@ -489,9 +490,108 @@ class CXRefs:
 
     return closest_node
 
+  def GetSignaturesForSearchSymbol(self, g_cs, filename, symbol, xref_kind=None):
+    print("Processing file: %s" % filename.name)
+    file_info = g_cs.GetFileInfo(filename)
+    signatures = set()
+    for annotation in file_info.GetAnnotations():
+      if not hasattr(annotation, 'xref_signature'):
+        continue
+      if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
+        continue
 
+      if annotation.xref_signature.signature in signatures:
+        continue
+
+      if not symbol in annotation.xref_signature.signature:
+        continue
+
+      signatures.add(annotation.xref_signature.signature)
+
+    return list(signatures)
+
+
+  def SearchForSymbol(self, g_cs, symbol):
+    search_response = g_cs.SendRequestToServer(
+        codesearch.CompoundRequest(search_request=[
+            codesearch.SearchRequest(
+                query="function:" + symbol,
+                exhaustive=True,
+                max_num_results=50,
+                return_all_duplicates=False,
+                return_all_snippets=False,
+                return_decorated_snippets=False,
+                return_directories=False,
+                return_line_matches=False,
+                return_snippets=False)
+        ])).search_response[0]
+
+    if not hasattr(search_response, 'search_result'):
+      return []
+
+    signatures = []
+    for result in search_response.search_result:
+
+      if not hasattr(result, 'top_file'):
+        continue
+
+      for sig in self.GetSignaturesForSearchSymbol(g_cs, result.top_file.file, "class-" + symbol + "("):
+        signatures.append(sig)
+
+    return signatures
+
+  def GetMojoCaller(self, caller, results, signature):
+      if self.in_mojo:
+        # Prevent infinite recursion. We call getCallGraphFor later in this
+        # call and it can easily wind up back here.
+        return True
+      self.in_mojo = True
+      g_cs = getCS(self.src_path);
+      csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
+      line = caller.call_site_range.start_line
+
+      service_method = signature.split('(')[0].split('::')[-1]
+      service_class = caller.display_name.split('::AcceptWithResponder(')[0].split('::')[-1].replace('StubDispatch', '')
+      search_term = service_class + '::' + service_method
+
+
+
+      print("Mojo caller: %s" % caller)
+      print("Signature: %s" % signature)
+      print("search term: %s" % search_term)
+
+      sigs = self.SearchForSymbol(g_cs, search_term)
+
+      # We may have multiple symbols, e.g., one for background_sync.mojom.h and one for background_sync.mojom-blink.h
+      # Dear god what a hack, let's go with the longer one...
+      longest = 0
+      final_sig = None
+      print("SIg options: ")
+      for sig in sigs:
+        if not '.mojom-' in sig:
+          continue
+        if not 'decl' in sig:
+          continue
+        final_sig = sig
+        break
+
+      if not final_sig:
+        return False
+
+      # Now we have the function that the client end of the mojo call should call
+      # Recurse!
+      print("Final sig: %s" % final_sig)
+      callers = self.getCallGraphFor(final_sig, references=None)
+      for caller in callers:
+        caller['display_name'] = "mojo: " + caller['display_name']
+        caller['calling_method'] = "mojo: " + caller['calling_method']
+        results.append(caller)
+
+      self.in_mojo = False
+      return len(callers) > 0
 
   def GetDoLoopCaller(self, caller, results):
+      g_cs = getCS(self.src_path);
       csfile = g_cs.GetFileInfo(self.src_path+caller.file_path)
       line = caller.call_site_range.start_line
 
@@ -626,9 +726,9 @@ class CXRefs:
     results = []
 
     # Add x-refs as callers too
-    node = codesearch.XrefNode.FromSignature(g_cs, signature);
+    signature_node = codesearch.XrefNode.FromSignature(g_cs, signature);
     if references is None:
-      references = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
+      references = signature_node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
 
     if len(references) < 10:
       for reference in references:
@@ -684,6 +784,8 @@ class CXRefs:
       handled = False
       if 'DoLoop' in caller.identifier:
         handled = self.GetDoLoopCaller(caller, results)
+      if not handled and 'Dispatch::AcceptWithResponder' in caller.display_name:
+        handled = self.GetMojoCaller(caller, results, signature)
       if not handled:
         call = { 'filename': caller.file_path,
                  'line': caller.call_site_range.start_line,
