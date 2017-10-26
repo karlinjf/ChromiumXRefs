@@ -1,14 +1,13 @@
 # Chromium X-Refs Plugin for Sublime Text
 
-![Screenshot](/media/chromium_x_refs.gif)
-
-### About
 The ChromiumXRefs plugin shows cross-references for Chromium code using the codesearch backend. It displays the x-refs in a window at the bottom of the editor. These include usages, callers, overrides, declaration, and implementation. There is special sauce built into the call-graph, such that it correctly infers callers that posttask (including from other threads), ipcs (cross-process call-graphs!), and state machine transitions (for DoLoop state machines). This means that the call graph can dig from a cache state in the net/ state-machine all the way back to the blink loader!
 
  1. Methods that create callbacks are considered callers
  1. IPC calls are detected and the sender is considered the caller
  1. net/ DoLoop state transitions are detected and considered callers
  1. Mojo callers are under construction
+
+![Screenshot](/media/chromium_x_refs.gif)
 
 ### Installation
 Using Package Control, install the package named ChromiumXRefs.
