@@ -10,13 +10,17 @@ import os.path
 import re
 import sys
 import time
-
+from pprint import pprint
 import sublime, sublime_plugin
 
 import ChromiumXRefs.third_party.codesearch as codesearch
 
 g_cs = None
 g_last_gcd_g_cs = datetime.datetime.now()
+
+
+def fullprint(obj):
+  pprint(vars(obj))
 
 
 
@@ -138,13 +142,13 @@ class CXRefs:
           # if we have no selection grab the current word
           word = view.word(region)
 
-          if view.substr(sublime.Region(word.a-2, word.b)).startswith("::"):
-            word = sublime.Region(word.a-2, word.b)
-          elif view.substr(sublime.Region(word.a-1, word.b)).startswith("~"):
-            word = sublime.Region(word.a-1, word.b)
+          # if view.substr(sublime.Region(word.a-2, word.b)).startswith("::"):
+          #   word = sublime.Region(word.a-2, word.b)
+          # elif view.substr(sublime.Region(word.a-1, word.b)).startswith("~"):
+          #   word = sublime.Region(word.a-1, word.b)
 
-          if view.substr(sublime.Region(word.a, word.b+1)).endswith("("):
-            word = sublime.Region(word.a, word.b+1)
+          # if view.substr(sublime.Region(word.a, word.b+1)).endswith("("):
+          #   word = sublime.Region(word.a, word.b+1)
 
           if not word.empty():
               self.selection_line = view.rowcol(region.a)[0]+1;
@@ -372,9 +376,9 @@ class CXRefs:
   def getSignatureForSelection(self, edit, view):
     self.signature = ''
     self.selected_word = self.getWord(view);
-    clean_word = self.selected_word.replace(':', '')
-    clean_word = clean_word.replace('~', '')
-    clean_word = clean_word.replace('(', '')
+    # clean_word = self.selected_word.replace(':', '')
+    # clean_word = clean_word.replace('~', '')
+    # clean_word = clean_word.replace('(', '')
     abs_file = posixPath(os.path.abspath(os.path.realpath(view.file_name())))
 
     root_path = getRoot(self, abs_file);
@@ -396,10 +400,39 @@ class CXRefs:
     # except Exception as e:
     #   x = 1  # do nothing
 
+    # # Grab the nearest signature. A signature exactly in the right line and column wins.
+    # signature = ''
+    # file_info = g_cs.GetFileInfo(abs_file)
+    # closest_line = 99999999
+    # print("Searching for signature: %s" % self.selected_word)
+    # for annotation in file_info.GetAnnotations():
+    #   sig = ''
+    #   if hasattr(annotation, 'xref_signature'):
+    #     sig = annotation.xref_signature.signature
+
+    #   if hasattr(annotation, 'internal_link'):
+    #     sig = annotation.internal_link.signature
+
+    #   if not sig:
+    #     continue
+
+
+    #   if self.selected_word in sig and clean_word in file_info.Text(annotation.range):
+    #     annotation_line = annotation.range.start_line
+    #     if abs(annotation_line - self.selection_line) < closest_line or annotation.range.Contains(self.selection_line, self.selection_column):
+    #       signature = sig
+    #       closest_line = abs(annotation_line - self.selection_line)
+
+    # self.signature = signature
+    # return self.signature != ''
+
     # Grab the nearest signature. A signature exactly in the right line and column wins.
+
+
     signature = ''
     file_info = g_cs.GetFileInfo(abs_file)
     closest_line = 99999999
+    print("Searching for signature: %s" % self.selected_word)
     for annotation in file_info.GetAnnotations():
       sig = ''
       if hasattr(annotation, 'xref_signature'):
@@ -411,8 +444,7 @@ class CXRefs:
       if not sig:
         continue
 
-
-      if self.selected_word in sig and clean_word in file_info.Text(annotation.range):
+      if self.selected_word in file_info.Text(annotation.range):
         annotation_line = annotation.range.start_line
         if abs(annotation_line - self.selection_line) < closest_line or annotation.range.Contains(self.selection_line, self.selection_column):
           signature = sig
@@ -476,7 +508,7 @@ class CXRefs:
     closest_line = -1
     closest_node = None
     for annotation in annotations:
-      if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
+      if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.METHOD:
         continue
       if not hasattr(annotation, 'xref_signature'):
         continue
@@ -497,7 +529,7 @@ class CXRefs:
     for annotation in file_info.GetAnnotations():
       if not hasattr(annotation, 'xref_signature'):
         continue
-      if not annotation.xref_kind == codesearch.NodeEnumKind.METHOD:
+      if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.METHOD:
         continue
 
       if annotation.xref_signature.signature in signatures:
@@ -600,7 +632,7 @@ class CXRefs:
       closest_enum = None
       found = False
       for annotation in annotations:
-        if not annotation.xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
+        if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
           continue
         if not hasattr(annotation, 'internal_link'):
           continue
@@ -675,7 +707,7 @@ class CXRefs:
     closest_line = -1
     message_ref = None
     for annotation in annotations:
-      if not annotation.xref_kind == codesearch.NodeEnumKind.TYPE_ALIAS:
+      if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.TYPE_ALIAS:
         continue
       if not hasattr(annotation, 'internal_link'):
         continue
@@ -784,8 +816,13 @@ class CXRefs:
       handled = False
       if 'DoLoop' in caller.identifier:
         handled = self.GetDoLoopCaller(caller, results)
-      if not handled and 'Dispatch::AcceptWithResponder' in caller.display_name:
+
+      file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
+      calling_method = file_info.Text(caller.call_scope_range)
+
+      if not handled and 'Dispatch::AcceptWithResponder' in calling_method:
         handled = self.GetMojoCaller(caller, results, signature)
+
       if not handled:
         call = { 'filename': caller.file_path,
                  'line': caller.call_site_range.start_line,
@@ -793,7 +830,7 @@ class CXRefs:
                  'text': caller.snippet.text.text,
                  'calling_method': caller.identifier,
                  'calling_signature': caller.signature,
-                 'display_name': caller.display_name
+                 'display_name': calling_method
                }
         results.append(call)
 
