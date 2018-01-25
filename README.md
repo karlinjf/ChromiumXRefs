@@ -1,4 +1,8 @@
+# !! NOTE !!
+The plugin is currently broken since the codesearch backend changed from grok to kythe. I hope to restore the plugin to its full glory but it'll be a bit of work.
+
 # Chromium X-Refs Plugin for Sublime Text
+
 
 The ChromiumXRefs plugin shows cross-references for Chromium code using the codesearch backend. It displays the x-refs in a window at the bottom of the editor. These include usages, callers, overrides, declaration, and implementation. There is special sauce built into the call-graph, such that it correctly infers callers that posttask (including from other threads), ipcs (cross-process call-graphs!), and state machine transitions (for DoLoop state machines). This means that the call graph can dig from a cache state in the net/ state-machine all the way back to the blink loader!
 
