@@ -22,8 +22,6 @@ g_last_gcd_g_cs = datetime.datetime.now()
 def fullprint(obj):
   pprint(vars(obj))
 
-
-
 def getCS(path=None):
   global g_cs
   global g_last_gcd_g_cs
@@ -465,27 +463,27 @@ class CXRefs:
     results = {'overridden':[], 'references':[]}
 
     node = codesearch.XrefNode.FromSignature(g_cs, signature);
-    refs = node.GetEdges([codesearch.EdgeEnumKind.HAS_DEFINITION,
-                          codesearch.EdgeEnumKind.HAS_DECLARATION,
-                          codesearch.EdgeEnumKind.OVERRIDES,
-                          codesearch.EdgeEnumKind.OVERRIDDEN_BY,
-                          codesearch.EdgeEnumKind.REFERENCED_AT],
-                          max_num_results="100");
+    refs = node.Traverse([codesearch.KytheXrefKind.DEFINITION,
+      codesearch.KytheXrefKind.DECLARATION,
+      codesearch.KytheXrefKind.OVERRIDES,
+      codesearch.KytheXrefKind.OVERRIDDEN_BY,
+      codesearch.KytheXrefKind.REFERENCE]);
+
     if not refs:
       return results
 
     xref_nodes = []
     for n in refs:
       xref = self.getRefForXrefNode(n)
-      if n.single_match.type == 'HAS_DEFINITION':
+      if n.single_match.type == 'DEFINITION':
         results['definition'] = xref
-      elif n.single_match.type == 'HAS_DECLARATION':
+      elif n.single_match.type == 'DECLARATION':
         results['declaration'] = xref
       elif n.single_match.type == 'OVERRIDES':
         results['overrides'] = xref
       elif n.single_match.type == 'OVERRIDDEN_BY':
         results['overridden'].append(xref)
-      elif n.single_match.type == 'REFERENCED_AT':
+      elif n.single_match.type == 'REFERENCE':
         results['references'].append(xref)
         xref_nodes.append(n)
 
@@ -508,7 +506,7 @@ class CXRefs:
     closest_line = -1
     closest_node = None
     for annotation in annotations:
-      if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.METHOD:
+      if not annotation.kythe_xref_kind == codesearch.KytheNodeKind.FUNCTION:
         continue
       if not hasattr(annotation, 'xref_signature'):
         continue
@@ -529,7 +527,7 @@ class CXRefs:
     for annotation in file_info.GetAnnotations():
       if not hasattr(annotation, 'xref_signature'):
         continue
-      if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.METHOD:
+      if not annotation.kythe_xref_kind == codesearch.KytheNodeKind.FUNCTION:
         continue
 
       if annotation.xref_signature.signature in signatures:
@@ -632,7 +630,7 @@ class CXRefs:
       closest_enum = None
       found = False
       for annotation in annotations:
-        if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.ENUM_CONSTANT:
+        if not annotation.kythe_xref_kind == codesearch.KytheNodeKind.CONSTANT:
           continue
         if not hasattr(annotation, 'internal_link'):
           continue
@@ -654,8 +652,8 @@ class CXRefs:
         # that this is the state enum that gets us here. Now figure out
         # where the state is set, that's our caller.
         node = codesearch.XrefNode.FromSignature(g_cs, closest_enum.internal_link.signature);
-        refs = node.GetEdges([codesearch.EdgeEnumKind.REFERENCED_AT],
-                        max_num_results="100");
+
+        refs = node.Traverse([codesearch.KytheXrefKind.REFERENCE], max_num_results=100);
 
         for ref in refs:
           if not ref.single_match.node_type == 'USAGE':
@@ -668,6 +666,7 @@ class CXRefs:
           method = self.getEnclosingMethod(ref)
           if method is None:
             continue
+          print(method)
 
           method_name = method.xref_signature.signature.split("(")[0]
           method_name = method_name.replace("class-", "")
@@ -707,6 +706,7 @@ class CXRefs:
     closest_line = -1
     message_ref = None
     for annotation in annotations:
+      # TODO: THIS IS NOW BROKEN, what is TYPE_ALIAS in codesearch.KytheNodeKind.XXX ?
       if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.TYPE_ALIAS:
         continue
       if not hasattr(annotation, 'internal_link'):
@@ -724,7 +724,7 @@ class CXRefs:
 
     # Get xrefs for the signature
     node = codesearch.XrefNode.FromSignature(g_cs, message_ref.internal_link.signature)
-    refs = node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
+    refs = node.Traverse(codesearch.KytheXrefKindEnumKind.REFERENCE)
     for ref in refs:
       if not ref.single_match.node_type == 'USAGE':
         continue
@@ -753,6 +753,16 @@ class CXRefs:
 
     return found
 
+  def getCallingMethodNameFromCaller(self, caller):
+      file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
+      return self.getCallingMethodNameFromRange(file_info, caller.call_scope_range);
+
+  def getCallingMethodNameFromRange(self, file_info, range):
+      range.start_column = 1
+      calling_method = file_info.Text(range).strip()
+      calling_method = calling_method[calling_method.find(" ")+1:]
+      return calling_method
+
   def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(self.src_path);
     results = []
@@ -760,20 +770,16 @@ class CXRefs:
     # Add x-refs as callers too
     signature_node = codesearch.XrefNode.FromSignature(g_cs, signature);
     if references is None:
-      references = signature_node.GetEdges(codesearch.EdgeEnumKind.REFERENCED_AT)
+      references = signature_node.Traverse()
 
     if len(references) < 10:
       for reference in references:
-
         method_node = self.getEnclosingMethod(reference)
         if not method_node is None:
           # This is the closest method to the line that the xref is on
           closest_sig = method_node.xref_signature.signature
+          method_name = "ref: " + self.getCallingMethodNameFromRange(reference.GetFile(), method_node.range)
 
-          method_name = closest_sig.split("(")[0]
-          method_name = method_name.replace("class-", "")
-          method_name = method_name.replace("cpp:", "")
-          method_name = "ref: " + method_name
           call = {
             'filename': reference.GetFile().Path(),
             'line': reference.single_match.line_number,
@@ -817,8 +823,9 @@ class CXRefs:
       if 'DoLoop' in caller.identifier:
         handled = self.GetDoLoopCaller(caller, results)
 
-      file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
-      calling_method = file_info.Text(caller.call_scope_range)
+      calling_method = self.getCallingMethodNameFromCaller(caller)
+
+
 
       if not handled and 'Dispatch::AcceptWithResponder' in calling_method:
         handled = self.GetMojoCaller(caller, results, signature)
