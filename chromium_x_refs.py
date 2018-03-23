@@ -759,6 +759,10 @@ class CXRefs:
 
   def getCallingMethodNameFromRange(self, file_info, range):
       range.start_column = 1
+      if range.end_column == 0:
+        range.end_column = 50
+        return file_info.Text(range).strip()
+
       calling_method = file_info.Text(range).strip()
       calling_method = calling_method[calling_method.find(" ")+1:]
       return calling_method
@@ -824,8 +828,6 @@ class CXRefs:
         handled = self.GetDoLoopCaller(caller, results)
 
       calling_method = self.getCallingMethodNameFromCaller(caller)
-
-
 
       if not handled and 'Dispatch::AcceptWithResponder' in calling_method:
         handled = self.GetMojoCaller(caller, results, signature)
