@@ -762,7 +762,6 @@ class CXRefs:
       if range.end_column == 0:
         range.end_column = 50
         return file_info.Text(range).strip()
-
       calling_method = file_info.Text(range).strip()
       calling_method = calling_method[calling_method.rfind(" ")+1:]
 
@@ -826,7 +825,6 @@ class CXRefs:
 
     if len(references) < 10:
       for reference in references:
-        print(reference)
         method_node = self.getEnclosingMethod(reference)
         if not method_node is None:
           # This is the closest method to the line that the xref is on
