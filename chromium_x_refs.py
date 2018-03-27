@@ -764,40 +764,13 @@ class CXRefs:
         return file_info.Text(range).strip()
 
       calling_method = file_info.Text(range).strip()
-      calling_method = calling_method[calling_method.find(" ")+1:]
+      calling_method = calling_method[calling_method.rfind(" ")+1:]
+
       return calling_method
 
   def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(self.src_path);
     results = []
-
-    # Add x-refs as callers too
-    signature_node = codesearch.XrefNode.FromSignature(g_cs, signature);
-    if references is None:
-      references = signature_node.Traverse()
-
-    if len(references) < 10:
-      for reference in references:
-        method_node = self.getEnclosingMethod(reference)
-        if not method_node is None:
-          # This is the closest method to the line that the xref is on
-          closest_sig = method_node.xref_signature.signature
-          method_name = "ref: " + self.getCallingMethodNameFromRange(reference.GetFile(), method_node.range)
-
-          call = {
-            'filename': reference.GetFile().Path(),
-            'line': reference.single_match.line_number,
-            'col': 0,
-            'text': reference.single_match.line_text,
-            'calling_signature': closest_sig,
-            'display_name': method_name
-          }
-
-          handled = False
-          if 'OnMessageReceived' in method_name:
-            handled = self.GetIPCCaller(call, reference, results)
-          if not handled:
-            results.append(call)
 
 
     response = g_cs.SendRequestToServer(
@@ -814,6 +787,8 @@ class CXRefs:
     node = response.call_graph_response[0].node
     if not hasattr(node, 'children'):
       return results
+
+    calling_methods = set()
 
     for caller in node.children:
       if caller.signature == last_signature:
@@ -841,7 +816,41 @@ class CXRefs:
                  'calling_signature': caller.signature,
                  'display_name': calling_method
                }
+        calling_methods.add(calling_method)
         results.append(call)
+
+    # Add x-refs as callers too
+    signature_node = codesearch.XrefNode.FromSignature(g_cs, signature);
+    if references is None:
+      references = signature_node.Traverse()
+
+    if len(references) < 10:
+      for reference in references:
+        print(reference)
+        method_node = self.getEnclosingMethod(reference)
+        if not method_node is None:
+          # This is the closest method to the line that the xref is on
+          closest_sig = method_node.xref_signature.signature
+          method_name = self.getCallingMethodNameFromRange(reference.GetFile(), method_node.range)
+          if method_name in calling_methods:
+            continue
+          calling_methods.add(method_name)
+          method_name = "ref: " + method_name
+
+          call = {
+            'filename': reference.GetFile().Path(),
+            'line': reference.single_match.line_number,
+            'col': 0,
+            'text': reference.single_match.line_text,
+            'calling_signature': closest_sig,
+            'display_name': method_name
+          }
+
+          handled = False
+          if 'OnMessageReceived' in method_name:
+            handled = self.GetIPCCaller(call, reference, results)
+          if not handled:
+            results.append(call)
 
     return results
 
