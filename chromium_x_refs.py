@@ -753,19 +753,60 @@ class CXRefs:
 
     return found
 
-  def getCallingMethodNameFromCaller(self, caller):
+
+  # This is heuristic black magic to transform a calling signature into a
+  # printable name in a call graph. Avert your eyes and burn it with fire!
+  def getCallingMethodNameFromSignature(self, caller):
+      xref_node = codesearch.XrefNode.FromSignature(g_cs, caller.signature);
+
+      # Get the text of the caller scope (e.g., the calling function name)
       file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
-      return self.getCallingMethodNameFromRange(file_info, caller.call_scope_range);
+      range = caller.call_scope_range
+      range.end_column = range.start_column + 100
+      caller_text = file_info.Text(range).strip()
+
+      # Let's see if we can find out some definition information about this caller
+      caller_definitions = []
+      try:
+        caller_definitions = xref_node.GetRelatedDefinitions()
+      except Exception as e:
+        caller_definitions = []
+
+      # No info, so try to infer what we can from caller_text
+      if not caller_definitions:
+        # Let's see if it's a test..
+        if 'TEST_F' in caller_text or 'TEST_P' in text:
+          test_class = text.split(",")[0].split("(")[-1].strip()
+          test_name = text.split(",")[1].split(")")[0].strip()
+          return test_class + "::" + test_name
+        if 'TEST' in caller_text:
+          test_name = text.split('[')[-1].split(']')[0]
+          return "TEST::" + test_name
+
+        # Give up and fall back to the filename
+        file_name = caller.file_path.split('/')[-1]
+        return file_name + '::' + caller_text
+
+
+      caller_definition = caller_definitions[-1].single_match;
+
+      if 'class' in caller_definition.line_text:
+        print(caller_definition.line_text)
+        caller_class = caller_definition.line_text.split(":")[0].strip()
+        print(caller_class)
+        caller_class = caller_class.split(" ")[-1].strip()
+        print(caller_class)
+        return caller_class + '::' + caller_text
+
+      return file_name + '::' + caller_text
+
+
 
   def getCallingMethodNameFromRange(self, file_info, range):
-      range.start_column = 1
+      # range.start_column = 1
       if range.end_column == 0:
         range.end_column = 50
-        return file_info.Text(range).strip()
-      calling_method = file_info.Text(range).strip()
-      calling_method = calling_method[calling_method.rfind(" ")+1:]
-
-      return calling_method
+      return file_info.Text(range).strip()
 
   def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(self.src_path);
@@ -801,7 +842,7 @@ class CXRefs:
       if 'DoLoop' in caller.identifier:
         handled = self.GetDoLoopCaller(caller, results)
 
-      calling_method = self.getCallingMethodNameFromCaller(caller)
+      calling_method = self.getCallingMethodNameFromSignature(caller)
 
       if not handled and 'Dispatch::AcceptWithResponder' in calling_method:
         handled = self.GetMojoCaller(caller, results, signature)
