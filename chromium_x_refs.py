@@ -45,6 +45,9 @@ def getCS(path=None):
 
 g_last_xref_cmd = None  # The last chromium cmd that ran
 
+def getLocationString(path, line_number):
+  return path + ":" + str(line_number)
+
 def posixPath(path):
   if os.path.sep == '\\':
     return path.replace('\\','/');
@@ -473,7 +476,16 @@ class CXRefs:
       return results
 
     xref_nodes = []
+    seen_xrefs = set()
+
     for n in refs:
+      # For some reason we're getting duplicates, filter them out
+      location = getLocationString(n.filespec.name, n.single_match.line_number)
+      if location in seen_xrefs:
+        continue
+      seen_xrefs.add(location)
+
+      print(n)
       xref = self.getRefForXrefNode(n)
       if n.single_match.type == 'DEFINITION':
         results['definition'] = xref
@@ -753,53 +765,70 @@ class CXRefs:
 
     return found
 
+  # signature, file path, call scope range
+
 
   # This is heuristic black magic to transform a calling signature into a
   # printable name in a call graph. Avert your eyes and burn it with fire!
+  # def getCallingMethodNameFromSignature(self, caller):
+  #     print("Caller: " + str(caller))
+  #     xref_node = codesearch.XrefNode.FromSignature(g_cs, caller.signature);
+  #     file_name = caller.file_path.split('/')[-1]
+  #     # Get the text of the caller scope (e.g., the calling function name)
+  #     file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
+  #     range = caller.call_scope_range
+  #     range.end_column = range.start_column + 100
+  #     caller_text = file_info.Text(range).strip()
+
+  #     # Let's see if we can find out some definition information about this caller
+  #     caller_definitions = []
+  #     try:
+  #       caller_definitions = xref_node.GetRelatedDefinitions()
+  #     except Exception as e:
+  #       caller_definitions = []
+
+  #     # No info, so try to infer what we can from caller_text
+  #     if not caller_definitions:
+  #       # Let's see if it's a test..
+  #       if 'TEST_F' in caller_text or 'TEST_P' in caller_text:
+  #         test_class = text.split(",")[0].split("(")[-1].strip()
+  #         test_name = text.split(",")[1].split(")")[0].strip()
+  #         return test_class + "::" + test_name
+  #       if 'TEST' in caller_text:
+  #         test_name = text.split('[')[-1].split(']')[0]
+  #         return "TEST::" + test_name
+
+  #       # Give up and fall back to the filename
+
+  #       return file_name + '::' + caller_text
+
+  #     for defin in caller_definitions:
+  #       print(defin)
+
+  #     caller_definition = caller_definitions[-1].single_match;
+
+  #     if 'class' in caller_definition.line_text:
+  #       print(caller_definition.line_text)
+
+  #       caller_class = caller_definition.line_text.replace('final', '')
+  #       caller_class = caller_class.split(":")[0].strip()
+  #       print(caller_class)
+  #       caller_class = caller_class.split(" ")[-1].strip()
+  #       print(caller_class)
+  #       return caller_class + '::' + caller_text
+
+  #     return file_name + '::' + caller_text
+
   def getCallingMethodNameFromSignature(self, caller):
-      xref_node = codesearch.XrefNode.FromSignature(g_cs, caller.signature);
+    xref_node = codesearch.XrefNode.FromSignature(g_cs, caller.signature);
+    file_name = caller.file_path.split('/')[-1]
+    file_name = file_name.replace('.cc','').strip()
+    file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
 
-      # Get the text of the caller scope (e.g., the calling function name)
-      file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
-      range = caller.call_scope_range
-      range.end_column = range.start_column + 100
-      caller_text = file_info.Text(range).strip()
-
-      # Let's see if we can find out some definition information about this caller
-      caller_definitions = []
-      try:
-        caller_definitions = xref_node.GetRelatedDefinitions()
-      except Exception as e:
-        caller_definitions = []
-
-      # No info, so try to infer what we can from caller_text
-      if not caller_definitions:
-        # Let's see if it's a test..
-        if 'TEST_F' in caller_text or 'TEST_P' in text:
-          test_class = text.split(",")[0].split("(")[-1].strip()
-          test_name = text.split(",")[1].split(")")[0].strip()
-          return test_class + "::" + test_name
-        if 'TEST' in caller_text:
-          test_name = text.split('[')[-1].split(']')[0]
-          return "TEST::" + test_name
-
-        # Give up and fall back to the filename
-        file_name = caller.file_path.split('/')[-1]
-        return file_name + '::' + caller_text
-
-
-      caller_definition = caller_definitions[-1].single_match;
-
-      if 'class' in caller_definition.line_text:
-        print(caller_definition.line_text)
-        caller_class = caller_definition.line_text.split(":")[0].strip()
-        print(caller_class)
-        caller_class = caller_class.split(" ")[-1].strip()
-        print(caller_class)
-        return caller_class + '::' + caller_text
-
-      return file_name + '::' + caller_text
-
+    range = caller.call_scope_range
+    range.end_column = range.start_column + 100
+    caller_text = file_info.Text(range).strip()
+    return file_name + '::' + caller_text
 
 
   def getCallingMethodNameFromRange(self, file_info, range):
@@ -828,7 +857,7 @@ class CXRefs:
     if not hasattr(node, 'children'):
       return results
 
-    calling_methods = set()
+    calling_ranges = set()
 
     for caller in node.children:
       if caller.signature == last_signature:
@@ -856,7 +885,7 @@ class CXRefs:
                  'calling_signature': caller.signature,
                  'display_name': calling_method
                }
-        calling_methods.add(calling_method)
+        calling_ranges.add(getLocationString(caller.file_path, caller.call_site_range.start_line))
         results.append(call)
 
     # Add x-refs as callers too
@@ -866,14 +895,22 @@ class CXRefs:
 
     if len(references) < 10:
       for reference in references:
+        if reference.single_match.type != codesearch.KytheXrefKind.REFERENCE:
+          continue
+
         method_node = self.getEnclosingMethod(reference)
         if not method_node is None:
           # This is the closest method to the line that the xref is on
           closest_sig = method_node.xref_signature.signature
           method_name = self.getCallingMethodNameFromRange(reference.GetFile(), method_node.range)
-          if method_name in calling_methods:
+
+          file_name = reference.GetFile().file_info.name
+          range_hash = getLocationString(reference.GetFile().Path(), reference.single_match.line_number)
+
+          if range_hash in calling_ranges:
             continue
-          calling_methods.add(method_name)
+          calling_ranges.add(range_hash)
+
           method_name = "ref: " + method_name
 
           call = {
