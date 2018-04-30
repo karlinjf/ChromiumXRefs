@@ -1,5 +1,5 @@
 # !! NOTE !!
-The plugin is currently broken since the codesearch backend changed from grok to kythe. I hope to restore the plugin to its full glory but it'll be a bit of work.
+The plugin was broken for months due to a backend change to kythe. It's now semi-restored to its former state. One of the biggest side-effects is that I can no longer accurately determine a method's class, so the filename is used instead.
 
 # Chromium X-Refs Plugin for Sublime Text
 
