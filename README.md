@@ -15,7 +15,7 @@ Using Package Control, install the package named ChromiumXRefs.
 
 ### Show cross-references for a given function or variable
 - **Command**: Chromium X-Refs
-- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\\\"], "command": "chromium_get_callers_hierarchy" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\\\"], "command": "chromium_xrefs" }
 - **Function**: Creates a bottom panel with links to declaration,
   definition, callers, overrides, and x-refs for the given text. Click on the caller to
   jump to the code. Click on the "+" sign next to the caller to delve deeper
@@ -28,7 +28,7 @@ Using Package Control, install the package named ChromiumXRefs.
 
 ### Recall last shown x-refs frame
 - **Command**: Chromium Recall X-Refs
-- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+shift+\\\\"], "command": "chromium_recall_get_callers_hierarchy" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+shift+\\\\"], "command": "chromium_recall_xrefs" }
 - **Function**: Recalls the last x-refs displayed. You don't have to be in the same source file you were
   in when you originally displayed the hierarchy. 
   
