@@ -28,7 +28,7 @@ Using Package Control, install the package named ChromiumXRefs.
 
 ### Recall last shown x-refs frame
 - **Command**: Chromium Recall X-Refs
-- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\\\"], "command": "chromium_recall_get_callers_hierarchy" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+shift+\\\\"], "command": "chromium_recall_get_callers_hierarchy" }
 - **Function**: Recalls the last x-refs displayed. You don't have to be in the same source file you were
   in when you originally displayed the hierarchy. 
   
