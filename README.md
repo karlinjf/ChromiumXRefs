@@ -15,7 +15,7 @@ Using Package Control, install the package named ChromiumXRefs.
 
 ### Show cross-references for a given function or variable
 - **Command**: Chromium X-Refs
-- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\"], "command": "chromium_get_callers_hierarchy" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\\\"], "command": "chromium_get_callers_hierarchy" }
 - **Function**: Creates a bottom panel with links to declaration,
   definition, callers, overrides, and x-refs for the given text. Click on the caller to
   jump to the code. Click on the "+" sign next to the caller to delve deeper
@@ -28,18 +28,18 @@ Using Package Control, install the package named ChromiumXRefs.
 
 ### Recall last shown x-refs frame
 - **Command**: Chromium Recall X-Refs
-- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\"], "command": "chromium_recall_get_callers_hierarchy" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\\\"], "command": "chromium_recall_get_callers_hierarchy" }
 - **Function**: Recalls the last x-refs displayed. You don't have to be in the same source file you were
   in when you originally displayed the hierarchy. 
   
 ### Jump to Definition
 - **Command**: Jump to Definition
-- **Suggested Keymap Binding**: { "keys": ["ctrl+\\"], "command": "chromium_xrefs_jump_to_definition" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+\\\\"], "command": "chromium_xrefs_jump_to_definition" }
 - **Function**: Jumps to the definition of the keyword.
 
 ### Jump to Declaration
 - **Command**: Jump to Definition
-- **Suggested Keymap Binding**: { "keys": ["ctrl+\\"], "command": "chromium_xrefs_jump_to_definition" }
+- **Suggested Keymap Binding**: { "keys": ["ctrl+\\\\"], "command": "chromium_xrefs_jump_to_definition" }
 - **Function**: Jumps to the definition of the keyword.
 
 ### Suggested mouse mapping
