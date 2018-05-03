@@ -1,6 +1,3 @@
-# !! NOTE !!
-The plugin was broken for months due to a backend change to kythe. It's now semi-restored to its former state. One of the biggest side-effects is that I can no longer accurately determine a method's class, so the filename is used instead.
-
 # Chromium X-Refs Plugin for Sublime Text
 
 
@@ -18,28 +15,32 @@ Using Package Control, install the package named ChromiumXRefs.
 
 ### Show cross-references for a given function or variable
 - **Command**: Chromium X-Refs
-- **Usage**: Ctrl+Alt+Left mouse click (or ctrl+alt+\\) on most text in the
-  C++ Chromium codebase. Use the command key instead of alt on OSX.
-- **Function**: Inserts a frame in the code with links to declaration,
-  definition, callers, and x-refs for the given text. Click on the caller to
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\"], "command": "chromium_get_callers_hierarchy" }
+- **Function**: Creates a bottom panel with links to declaration,
+  definition, callers, overrides, and x-refs for the given text. Click on the caller to
   jump to the code. Click on the "+" sign next to the caller to delve deeper
   in the call stack. Click on the "-tests" button on the top to remove
   functions with "test" in their name. Click on the "X" button in the top
-  right to close the frame.
+  right to close the panel.
 - **Notes**: The data is retrieved from cs.chromium.org and the data will
   only be as recent as what that site last indexed. This means local changes
   you have made to the codebase will not be reflected.
 
 ### Recall last shown x-refs frame
 - **Command**: Chromium Recall X-Refs
-- **Usage**: Ctrl+Alt+Right mouse click (or ctrl+alt+shift+\\) anywhere in C++
-  code. Use the command key instead of alt on OSX.
-- **Function**: Recalls the last x-refs frame displayed and inserts it below
-  the cursor's position. You don't have to be in the same source file you were
-  in when you originally displayed the hierarchy. This is useful when
-  exploring through a call stack and you need to recall the last hierarchy
-  that you displayed.
+- **Suggested Keymap Binding**: { "keys": ["ctrl+alt+\\"], "command": "chromium_recall_get_callers_hierarchy" }
+- **Function**: Recalls the last x-refs displayed. You don't have to be in the same source file you were
+  in when you originally displayed the hierarchy. 
+  
+### Jump to Definition
+- **Command**: Jump to Definition
+- **Suggested Keymap Binding**: { "keys": ["ctrl+\\"], "command": "chromium_xrefs_jump_to_definition" }
+- **Function**: Jumps to the definition of the keyword.
 
+### Jump to Declaration
+- **Command**: Jump to Definition
+- **Suggested Keymap Binding**: { "keys": ["ctrl+\\"], "command": "chromium_xrefs_jump_to_definition" }
+- **Function**: Jumps to the definition of the keyword.
 
 ### Suggested mouse mapping
 - A mouse mapping is quite useful for this plugin. Paste the following in your
@@ -53,7 +54,7 @@ Using Package Control, install the package named ChromiumXRefs.
     "count": "1",
     "modifiers": ["ctrl", "alt"],
     "press_command": "drag_select",
-    "command": "chromium_xrefs"
+    "command": "chromium_get_callers_hierarchy"
   },
 
   {
@@ -61,7 +62,7 @@ Using Package Control, install the package named ChromiumXRefs.
     "count": "1",
     "modifiers": ["ctrl", "alt"],
     "press_command": "drag_select",
-    "command": "chromium_recall_xrefs"
+    "command": "chromium_recall_get_callers_hierarchy"
   }
 ]
 ```
