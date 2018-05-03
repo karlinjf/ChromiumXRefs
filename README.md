@@ -38,7 +38,7 @@ Using Package Control, install the package named ChromiumXRefs.
 - **Function**: Jumps to the definition of the keyword.
 
 ### Jump to Declaration
-- **Command**: Jump to Definition
+- **Command**: Jump to Declaration
 - **Suggested Keymap Binding**: { "keys": ["ctrl+\\\\"], "command": "chromium_xrefs_jump_to_definition" }
 - **Function**: Jumps to the definition of the keyword.
 
