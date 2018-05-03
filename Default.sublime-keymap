@@ -15,6 +15,10 @@
     [
         {"key": "selector", "operator": "equal", "operand": "source.c++"}
     ],
-  }
+  },
+  
+  { "keys": ["ctrl+\\"], "command": "chromium_xrefs_jump_to_definition" },
+  
+  { "keys": ["ctrl+shift+\\"], "command": "chromium_xrefs_jump_to_declaration" }
 ]
 
