@@ -485,7 +485,6 @@ class CXRefs:
         continue
       seen_xrefs.add(location)
 
-      print(n)
       xref = self.getRefForXrefNode(n)
       if n.single_match.type == 'DEFINITION':
         results['definition'] = xref
@@ -819,6 +818,8 @@ class CXRefs:
 
   #     return file_name + '::' + caller_text
 
+
+
   def getCallingMethodNameFromSignature(self, caller):
     xref_node = codesearch.XrefNode.FromSignature(g_cs, caller.signature);
     file_name = caller.file_path.split('/')[-1]
@@ -828,6 +829,13 @@ class CXRefs:
     range = caller.call_scope_range
     range.end_column = range.start_column + 100
     caller_text = file_info.Text(range).strip()
+    if not caller_text:
+      # HACK. In case the range is off by one, try the next line. It just so
+      # happened to be on the next line the one time this happened to me.
+      range.start_line += 1
+      range.end_line += 1
+      caller_text = file_info.Text(range).strip()
+
     return file_name + '::' + caller_text
 
 
