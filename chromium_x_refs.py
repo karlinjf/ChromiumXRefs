@@ -53,6 +53,7 @@ def posixPath(path):
     return path.replace('\\','/');
   return path;
 
+# Given a path (e.g., /c/src/foo.cc), returns everything from the src/ on.
 def getRoot(cmd, path):
   src_split = path.split('src')
   src_count = len(src_split)
@@ -127,11 +128,6 @@ def finishGoingToLocation(caller, view):
   view.sel().clear()
   view.sel().add(closest_region)
 
-def goToSelection(cmd, src_path, callers, sel, view):
-  if sel < 0:
-    return
-  goToLocation(cmd, src_path, callers[sel], view)
-
 class CXRefs:
   def __init__(self):
     self.data = {}
@@ -142,14 +138,6 @@ class CXRefs:
       if region.empty():
           # if we have no selection grab the current word
           word = view.word(region)
-
-          # if view.substr(sublime.Region(word.a-2, word.b)).startswith("::"):
-          #   word = sublime.Region(word.a-2, word.b)
-          # elif view.substr(sublime.Region(word.a-1, word.b)).startswith("~"):
-          #   word = sublime.Region(word.a-1, word.b)
-
-          # if view.substr(sublime.Region(word.a, word.b+1)).endswith("("):
-          #   word = sublime.Region(word.a, word.b+1)
 
           if not word.empty():
               self.selection_line = view.rowcol(region.a)[0]+1;
@@ -170,6 +158,8 @@ class CXRefs:
     xref_data['phantom_set'].update([])
     view.window().run_command("hide_panel", {"panel": "output.chromium_x_refs"})
 
+  # The user has clicked on a link in the phantom. Parse the link and figure
+  # out what action to take.
   def processLink(self, link, callers, view):
     g_cs = getCS();
     link_type = link.split(':')[0]
@@ -203,12 +193,18 @@ class CXRefs:
         doc = self.genHtml();
         self.updatePhantom(self.createPhantom(doc, view), view);
         return;
+      else:
+        print("Unknown filter type");
+        return;
 
     if link_type == 'nofilter':
       if link.split(':')[1] == 'test':
         self.show_tests = True;
         doc = self.genHtml()
         self.updatePhantom(self.createPhantom(doc, view), view);
+        return;
+      else:
+        print("Unknown filter type");
         return;
 
     if link_type == 'killPhantom':
@@ -226,17 +222,13 @@ class CXRefs:
 
     if (link_type == 'target'):
       goToLocation(self, self.src_path, caller, view);
+
     elif (link_type == 'expand'):
       caller['callers'] = self.getCallGraphFor(caller['calling_signature'])
       doc = self.genHtml()
       self.updatePhantom(self.createPhantom(doc, view), view);
 
     elif (link_type == 'shrink'):
-      caller.pop('callers')
-      doc = self.genHtml()
-      self.updatePhantom(self.createPhantom(doc, view), view);
-
-    elif (link_type == 'filter'):
       caller.pop('callers')
       doc = self.genHtml()
       self.updatePhantom(self.createPhantom(doc, view), view);
@@ -374,12 +366,11 @@ class CXRefs:
     return body
 
 
+  # Scans the annotations in the file for the closest signature to the current
+  # position with matching text.
   def getSignatureForSelection(self, edit, view):
     self.signature = ''
     self.selected_word = self.getWord(view);
-    # clean_word = self.selected_word.replace(':', '')
-    # clean_word = clean_word.replace('~', '')
-    # clean_word = clean_word.replace('(', '')
     abs_file = posixPath(os.path.abspath(os.path.realpath(view.file_name())))
 
     root_path = getRoot(self, abs_file);
@@ -391,44 +382,6 @@ class CXRefs:
     self.selection_ref = {'line': self.selection_line, 'filename': root_path }
 
     g_cs = getCS(self.src_path);
-
-    # # First see if we have an exact match at this location (e.g., unedited file)
-    # try:
-    #   sig = g_cs.GetSignatureForLocation(abs_file, self.selection_line, self.selection_column);
-    #   if self.selected_word in sig:
-    #     self.signature = sig
-    #     return True
-    # except Exception as e:
-    #   x = 1  # do nothing
-
-    # # Grab the nearest signature. A signature exactly in the right line and column wins.
-    # signature = ''
-    # file_info = g_cs.GetFileInfo(abs_file)
-    # closest_line = 99999999
-    # print("Searching for signature: %s" % self.selected_word)
-    # for annotation in file_info.GetAnnotations():
-    #   sig = ''
-    #   if hasattr(annotation, 'xref_signature'):
-    #     sig = annotation.xref_signature.signature
-
-    #   if hasattr(annotation, 'internal_link'):
-    #     sig = annotation.internal_link.signature
-
-    #   if not sig:
-    #     continue
-
-
-    #   if self.selected_word in sig and clean_word in file_info.Text(annotation.range):
-    #     annotation_line = annotation.range.start_line
-    #     if abs(annotation_line - self.selection_line) < closest_line or annotation.range.Contains(self.selection_line, self.selection_column):
-    #       signature = sig
-    #       closest_line = abs(annotation_line - self.selection_line)
-
-    # self.signature = signature
-    # return self.signature != ''
-
-    # Grab the nearest signature. A signature exactly in the right line and column wins.
-
 
     signature = ''
     file_info = g_cs.GetFileInfo(abs_file)
@@ -454,6 +407,8 @@ class CXRefs:
     self.signature = signature
     return self.signature != ''
 
+  #TODO Remove this dictionary and just use xref nodes. That way we have more
+  #data available.
   def getRefForXrefNode(self, node):
     return { 'filename': node.filespec.name,
              'signature': node.GetSignature(),
@@ -500,6 +455,7 @@ class CXRefs:
 
     return (results, xref_nodes)
 
+  # For a given reference, finds the nearest function annotation to it in the file.
   def getEnclosingMethod(self, edge):
     g_cs = getCS();
 
@@ -820,13 +776,16 @@ class CXRefs:
 
 
 
+  # Needs signature, file_info, and range
   def getCallingMethodNameFromSignature(self, caller):
-    xref_node = codesearch.XrefNode.FromSignature(g_cs, caller.signature);
-    file_name = caller.file_path.split('/')[-1]
-    file_name = file_name.replace('.cc','').strip()
     file_info = g_cs.GetFileInfo(self.src_path + caller.snippet_file_path)
+    return self.getCallingMethodName(caller.signature, file_info, caller.call_scope_range)
 
-    range = caller.call_scope_range
+  def getCallingMethodName(self, signature, file_info, range):
+    xref_node = codesearch.XrefNode.FromSignature(g_cs, signature);
+    file_name = file_info.Path().split('/')[-1]
+    file_name = file_name.replace('.cc','').strip()
+
     range.end_column = range.start_column + 100
     caller_text = file_info.Text(range).strip()
     if not caller_text:
@@ -838,18 +797,12 @@ class CXRefs:
 
     return file_name + '::' + caller_text
 
-
-  def getCallingMethodNameFromRange(self, file_info, range):
-      # range.start_column = 1
-      if range.end_column == 0:
-        range.end_column = 50
-      return file_info.Text(range).strip()
-
   def getCallGraphFor(self, signature, references=None):
     g_cs = getCS(self.src_path);
     results = []
 
-
+    # TODO: Is it really necessary to make this request? It seems like the
+    # references could have the necessary callers (e.g., by calling Traverse).
     response = g_cs.SendRequestToServer(
       codesearch.CompoundRequest(call_graph_request=[codesearch.CallGraphRequest(
         file_spec=g_cs.GetFileSpec(),
@@ -858,83 +811,83 @@ class CXRefs:
       ]))
 
     last_signature = ''
-    if not response.call_graph_response:
-      return results
-
-    node = response.call_graph_response[0].node
-    if not hasattr(node, 'children'):
-      return results
-
     calling_ranges = set()
 
-    for caller in node.children:
-      if caller.signature == last_signature:
-        continue
-      if not caller.snippet_file_path:
-        continue
+    if response.call_graph_response:
+      node = response.call_graph_response[0].node
+      if hasattr(node, 'children'):
 
-      last_signature = caller.signature
+        for caller in node.children:
+          if caller.signature == last_signature:
+            continue
+          if not caller.snippet_file_path:
+            continue
 
-      handled = False
-      if 'DoLoop' in caller.identifier:
-        handled = self.GetDoLoopCaller(caller, results)
+          last_signature = caller.signature
 
-      calling_method = self.getCallingMethodNameFromSignature(caller)
+          handled = False
+          if 'DoLoop' in caller.identifier:
+            handled = self.GetDoLoopCaller(caller, results)
 
-      if not handled and 'Dispatch::AcceptWithResponder' in calling_method:
-        handled = self.GetMojoCaller(caller, results, signature)
+          calling_method = self.getCallingMethodNameFromSignature(caller)
 
-      if not handled:
-        call = { 'filename': caller.file_path,
-                 'line': caller.call_site_range.start_line,
-                 'col': caller.call_site_range.start_column,
-                 'text': caller.snippet.text.text,
-                 'calling_method': caller.identifier,
-                 'calling_signature': caller.signature,
-                 'display_name': calling_method
-               }
-        calling_ranges.add(getLocationString(caller.file_path, caller.call_site_range.start_line))
-        results.append(call)
+          if not handled and 'Dispatch::AcceptWithResponder' in calling_method:
+            handled = self.GetMojoCaller(caller, results, signature)
+
+          if not handled:
+            call = { 'filename': caller.file_path,
+                     'line': caller.call_site_range.start_line,
+                     'col': caller.call_site_range.start_column,
+                     'text': caller.snippet.text.text,
+                     'calling_method': caller.identifier,
+                     'calling_signature': caller.signature,
+                     'display_name': calling_method
+                   }
+            calling_ranges.add(getLocationString(caller.file_path, caller.call_site_range.start_line))
+            results.append(call)
 
     # Add x-refs as callers too
     signature_node = codesearch.XrefNode.FromSignature(g_cs, signature);
     if references is None:
       references = signature_node.Traverse()
 
-    if len(references) < 10:
-      for reference in references:
-        if reference.single_match.type != codesearch.KytheXrefKind.REFERENCE:
+    refs_processed = 0
+    for reference in references:
+      if reference.single_match.type_id != codesearch.KytheXrefKind.REFERENCE:
+        continue
+      if refs_processed == 10:
+        break
+      refs_processed += 1
+
+      method_node = self.getEnclosingMethod(reference)
+      if not method_node is None:
+        # This is the closest method to the line that the xref is on
+        closest_sig = method_node.xref_signature.signature
+        method_name = self.getCallingMethodName(closest_sig, reference.GetFile(), method_node.range)
+
+        file_name = reference.GetFile().file_info.name
+        range_hash = getLocationString(reference.GetFile().Path(), reference.single_match.line_number)
+
+        if range_hash in calling_ranges:
           continue
+        calling_ranges.add(range_hash)
 
-        method_node = self.getEnclosingMethod(reference)
-        if not method_node is None:
-          # This is the closest method to the line that the xref is on
-          closest_sig = method_node.xref_signature.signature
-          method_name = self.getCallingMethodNameFromRange(reference.GetFile(), method_node.range)
+        method_name = "ref: " + method_name
 
-          file_name = reference.GetFile().file_info.name
-          range_hash = getLocationString(reference.GetFile().Path(), reference.single_match.line_number)
+        call = {
+          'filename': reference.GetFile().Path(),
+          'line': reference.single_match.line_number,
+          'col': 0,
+          'text': reference.single_match.line_text,
+          'calling_signature': closest_sig,
+          'display_name': method_name
+        }
 
-          if range_hash in calling_ranges:
-            continue
-          calling_ranges.add(range_hash)
-
-          method_name = "ref: " + method_name
-
-          call = {
-            'filename': reference.GetFile().Path(),
-            'line': reference.single_match.line_number,
-            'col': 0,
-            'text': reference.single_match.line_text,
-            'calling_signature': closest_sig,
-            'display_name': method_name
-          }
-
-          handled = False
-          if 'OnMessageReceived' in method_name:
-            handled = self.GetIPCCaller(call, reference, results)
-          if not handled:
-            results.append(call)
+        handled = False
+        if 'OnMessageReceived' in method_name:
+          handled = self.GetIPCCaller(call, reference, results)
+        if not handled:
+          results.append(call)
 
     return results
 
