@@ -1042,7 +1042,7 @@ class CodeSearch(object):
     |filename| specifies a file on disk (or just relative to the
     |source_root|).  |buffer_lines| is a list of strings containing the
     expected contents of the file.
-    
+
     If |check_prefix| is true, then only the first len(buffer_lines) lines of
     |filename| are compared.
     """

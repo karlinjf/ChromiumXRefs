@@ -656,9 +656,11 @@ class CXRefs:
       return found
 
   def GetIPCCaller(self, call, reference, results):
+    print("Get IPC caller")
     g_cs = getCS(self.src_path);
     line = reference.single_match.line_number
     line_text = reference.single_match.line_text
+    print(line_text)
     # line text: IPC_MESSAGE_HANDLER(CacheStorageHostMsg_CacheStorageKeys, OnCacheStorageKeys)
 
     # Get the signature for the message
@@ -668,17 +670,17 @@ class CXRefs:
       [codesearch.AnnotationType(id=codesearch.AnnotationTypeValue.LINK_TO_DEFINITION)])
     if not hasattr(response.annotation_response[0], 'annotation'):
       return False
+    print("Found annotation")
     annotations = response.annotation_response[0].annotation
 
     closest_line = -1
     message_ref = None
     for annotation in annotations:
-      # TODO: THIS IS NOW BROKEN, what is TYPE_ALIAS in codesearch.KytheNodeKind.XXX ?
-      if not annotation.kythe_xref_kind == codesearch.NodeEnumKind.TYPE_ALIAS:
+      if not annotation.kythe_xref_kind == codesearch.KytheNodeKind.TALIAS:
         continue
       if not hasattr(annotation, 'internal_link'):
         continue
-
+      print(annotation)
       annotation_line = annotation.range.start_line
       if annotation_line > closest_line and annotation_line <= line:
         closest_line = annotation_line
@@ -689,10 +691,25 @@ class CXRefs:
 
     found = False
 
+
     # Get xrefs for the signature
-    node = codesearch.XrefNode.FromSignature(g_cs, message_ref.internal_link.signature)
-    refs = node.Traverse(codesearch.KytheXrefKindEnumKind.REFERENCE)
+    node = codesearch.XrefNode.FromAnnotation(g_cs, message_ref)
+
+    ## THIS IS BROKEN NOW WITH KYTHE. Unfortunately.. the references for the
+    #  node don't include the freaking SEND() messages. It just has the
+    #  definition and the OnMessageReceived usage. If you click on the message
+    #  name next to SEND it has no references. 
+    # So we'll probably have to do a search for the message and find the usage
+    # that way.. ugh.
+
+    # e.g., search for "new SubresourceFilterHostMsg_DidDisallowFirstSubresource"
+
+
+    refs = node.Traverse(codesearch.KytheXrefKind.REFERENCE)
+#    refs = node.Traverse()
     for ref in refs:
+      print(ref)
+      continue
       if not ref.single_match.node_type == 'USAGE':
         continue
       if not 'new' in ref.single_match.line_text:
